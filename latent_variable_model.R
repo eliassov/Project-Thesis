@@ -6,13 +6,39 @@ if (!dir.exists(personal_lib)) {
 .libPaths(c(personal_lib, .libPaths()))
 
 # Install missing packages
-required_packages <- c("rstan", "tidyverse", "nadiv", "shinystan")
+required_packages <- c("rstan", "tidyverse", "nadiv")
 for (pkg in required_packages) {
   if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
     install.packages(pkg, lib = personal_lib, repos = "https://cloud.r-project.org")
     library(pkg, character.only = TRUE)
   }
 }
+
+
+
+script_path <- NULL
+cmd_args <- commandArgs(trailingOnly = FALSE)
+if (any(grepl("^--file=", cmd_args))) {
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  script_path <- sub("^--file=", "", file_arg)
+  script_path <- normalizePath(script_path)
+}
+if (is.null(script_path)) {
+  src_file <- tryCatch(getSrcFilename(function(x) x, full.names = TRUE),
+                       error = function(e) NULL)
+  if (!is.null(src_file) && file.exists(src_file)) script_path <- src_file
+}
+if (is.null(script_path) || !file.exists(script_path)) {
+  script_path <- getwd()
+  message("Warning: Using getwd(): ", script_path)
+} else {
+  script_path <- dirname(script_path)
+  message("Success: Script directory: ", script_path)
+}
+setwd(script_path)
+cat("Working directory set to:", getwd(), "\n")
+
+
 
 # Load data
 traitData <- read.csv("morphology.txt",
@@ -136,9 +162,9 @@ tomonitor_lv <- c(
   "mu",                  # trait means (standardised scale)
   "lambda",              # loadings 
   "sd_psi_a",            # LV genetic SD
-  "sd_psi_e",            # LV non-genetic individual SD (this replaced sd_psi_r!)
+  "sd_psi_e",            # LV non-genetic individual SD
   "sd_R",                # trait-specific residual SDs
-  "var_psi_a",           # optional but nice to have directly
+  "var_psi_a",           
   "var_psi_e",
   "h2_psi",
   "h2_traits",           # observed trait heritabilities
@@ -154,11 +180,6 @@ out_lv <- stan(file = 'latent_variable_stan.stan',
                refresh = 10,
                seed = 123)
 
-# out_lv <- stan(file = "simple_stan.stan", data = dataset_lv, pars=tomonitor_lv, 
-#                chains = 1, iter = 2000, seed = 123)
-
-print(out_lv)                                      # see which chains failed
-out_lv
 
 # Save results
 saveRDS(out_lv, 'Output_LV_Animal_Model.rds')
@@ -169,21 +190,12 @@ summ_lv <- summary(out_lv)$summary
 write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary.csv", row.names = TRUE)
 cat("Summary written to: Output_LV_Summary.csv\n")
 
-# Export shinystan report
-# library(shinystan)
-# shy_lv <- as.shinystan(out_lv)
-# shinystan::export(shy_lv, dir = "shinystan_report_lv", overwrite = TRUE)
-# cat("Shinystan HTML report written to folder: shinystan_report_lv\n")
-
 
 
 
 # =============================================================================
-# BACK-TRANSFORMATION + FULL SUMMARY (2025-11-17 final version)
-# =============================================================================
-# =============================================================================
-# FINAL BACK-TRANSFORMATION + RESULTS TABLE (variances, standardized LV, server-safe)
-# =============================================================================
+# BACK-TRANSFORMATION 
+
 fit <- out_lv
 samples <- rstan::extract(fit)
 
@@ -273,87 +285,3 @@ write.csv(posterior_summary, "Output_LV_Final_Results.csv", row.names = FALSE)
 cat("\n=== LATENT VARIABLE MODEL RESULTS (original scale) ===\n")
 print(posterior_summary, row.names = FALSE)
 cat("\nResults saved to: Output_LV_Final_Results.csv\n")
-
-
-
-
-
-# =============================================================================
-# BACK-TRANSFORMATION: Convert posterior samples from standardized to original scale
-# =============================================================================
-
-# Load the fitted model (if not already in environment)
-# fit <- out_lv  # or: 
-# fit <- readRDS("Output_LV_Animal_Model.rds")
-# 
-# # Extract posterior samples
-# samples <- rstan::extract(fit)
-# 
-# # Get original means and SDs from the raw data (used for standardization)
-# mean_wing <- mean(trait_subset_lv$ving_h)
-# sd_wing   <- sd(trait_subset_lv$ving_h)
-# mean_beak <- mean(trait_subset_lv$nebb_l)
-# sd_beak   <- sd(trait_subset_lv$nebb_l)
-# 
-# # 1. Back-transform trait means (mu)
-# mu_wing_orig <- samples$mu[,1] * sd_wing + mean_wing
-# mu_beak_orig <- samples$mu[,2] * sd_beak + mean_beak
-# 
-# # 2. Back-transform genetic variance of the latent variable (var_psi_a)
-# # → This is shared; we scale by a weighted average of trait variances
-# #     (or report per-trait genetic variance below)
-# var_psi_a_orig <- samples$var_psi_a * (sd_wing^2 + sd_beak^2) / 2 # IS THIS CORRECT? 
-# 
-# # 3. Trait-specific genetic variances (more accurate)
-# gen_var_wing_orig <- (samples$lambda[,1]^2) * samples$var_psi_a * sd_wing^2
-# gen_var_beak_orig <- (samples$lambda[,2]^2) * samples$var_psi_a * sd_beak^2
-# 
-# # 4. Residual variances
-# res_var_wing_orig <- samples$sd_R[,1]^2 * sd_wing^2
-# res_var_beak_orig <- samples$sd_R[,2]^2 * sd_beak^2
-# 
-# # 5. Create summary data frame with back-transformed key parameters
-# posterior_summary <- data.frame(
-#   Parameter = c(
-#     "mu_wing", "mu_beak",
-#     "gen_var_wing", "gen_var_beak",
-#     "res_var_wing", "res_var_beak",
-#     "h2_wing", "h2_beak", "h2_psi"
-#   ),
-#   Mean = c(
-#     mean(mu_wing_orig), mean(mu_beak_orig),
-#     mean(gen_var_wing_orig), mean(gen_var_beak_orig),
-#     mean(res_var_wing_orig), mean(res_var_beak_orig),
-#     mean(samples$h2_traits[,1]), mean(samples$h2_traits[,2]),
-#     mean(samples$h2_psi)
-#   ),
-#   SD = c(
-#     sd(mu_wing_orig), sd(mu_beak_orig),
-#     sd(gen_var_wing_orig), sd(gen_var_beak_orig),
-#     sd(res_var_wing_orig), sd(res_var_beak_orig),
-#     sd(samples$h2_traits[,1]), sd(samples$h2_traits[,2]),
-#     sd(samples$h2_psi)
-#   ),
-#   `2.5%` = c(
-#     quantile(mu_wing_orig, 0.025), quantile(mu_beak_orig, 0.025),
-#     quantile(gen_var_wing_orig, 0.025), quantile(gen_var_beak_orig, 0.025),
-#     quantile(res_var_wing_orig, 0.025), quantile(res_var_beak_orig, 0.025),
-#     quantile(samples$h2_traits[,1], 0.025), quantile(samples$h2_traits[,2], 0.025),
-#     quantile(samples$h2_psi, 0.025)
-#   ),
-#   `97.5%` = c(
-#     quantile(mu_wing_orig, 0.975), quantile(mu_beak_orig, 0.975),
-#     quantile(gen_var_wing_orig, 0.975), quantile(gen_var_beak_orig, 0.975),
-#     quantile(res_var_wing_orig, 0.975), quantile(res_var_beak_orig, 0.975),
-#     quantile(samples$h2_traits[,1], 0.975), quantile(samples$h2_traits[,2], 0.975),
-#     quantile(samples$h2_psi, 0.975)
-#   )
-# )
-# 
-# summary(fit, pars = "lambda")$summary ## INCLUDE THIS?
-# 
-# 
-# # Round and save
-# posterior_summary[] <- lapply(posterior_summary, function(x) if(is.numeric(x)) round(x, 4) else x)
-# write.csv(posterior_summary, "Output_LV_BackTransformed_Summary.csv", row.names = FALSE)
-# cat("Back-transformed summary saved to: Output_LV_BackTransformed_Summary.csv\n")
