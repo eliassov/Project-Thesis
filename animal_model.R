@@ -88,13 +88,11 @@ pedigree_prepped <- prepPed(pedigree_full, gender = NULL, check = TRUE)
 
 
 
-# Re-run makeA
 tryCatch({
   A_nadiv <- makeA(pedigree_prepped)
   A_nadiv_dense <- as.matrix(A_nadiv)
   cat("New A matrix computed. Dimensions:", dim(A_nadiv_dense), "\n")
   cat("Diagonal summary:", summary(diag(A_nadiv_dense)), "\n")
-  cat("Parent-offspring check (8L19506, 8L19505):", A_nadiv_dense["8L19506", "8L19505"], "\n")
 }, error = function(e) {
   cat("nadiv Error:", e$message, "\n")
 })
