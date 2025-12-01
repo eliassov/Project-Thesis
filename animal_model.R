@@ -249,8 +249,8 @@ options(mc.cores = parallel::detectCores())
 
 # MCMC settings
 nc <- 4    # Number of Chains
-nw <- 1000 # Warmup iterations
-ni <- 2000 # Total iterations
+nw <- 3000 # Warmup iterations
+ni <- 6000 # Total iterations
 nt <- 1    # Thinning
 
 
@@ -266,17 +266,30 @@ out_1 <- stan(file = 'animal_model_univariate.stan',
 
 saveRDS(out_1, file = "Output_Univariate_Animal_Model.rds")
 summ_uni <- summary(out_1)$summary
-write.csv(as.data.frame(summ_uni), "Output_Univariate_Summary.csv", row.names = FALSE)
+write.csv(as.data.frame(summ_uni), "Output_Univariate_Summary.csv", row.names = TRUE)
 
 
 cat("Summary written to: Output_Univariate_Summary.csv\n")
 
 
 
-
-
-
-
+# # 1. Load libraries
+# library(rstan)
+# 
+# # 2. Load results
+# fit <- readRDS("Output_Univariate_Animal_Model.rds")
+# 
+# # 3. Check what parameters are actually inside
+# print(names(fit)) 
+# 
+# # 4. Run Traceplot with 'beta' instead of 'mu'
+# # Note: 'beta' is a vector, so we access specific elements if needed, 
+# # but usually just 'beta' works to show both.
+# traceplot(fit, pars = c("beta", "var_A", "var_E", "heritability"), inc_warmup = FALSE)
+# 
+# # 5. Print the summary with proper row names (so you can see labels)
+# summary_stats <- summary(fit, pars = c("beta", "var_A", "var_E", "var_R", "var_P", "heritability"))$summary
+# print(summary_stats)
 
 
 
