@@ -172,8 +172,7 @@ model {
 generated quantities {
     real<lower=0> var_P;
     real<lower=0> heritability;
-    // REMOVED: evolvability (Calculating it with fixed effects is complex/ambiguous)
-    
+
     var_P = var_A + var_E + var_R;
     heritability = var_A / var_P;
 }

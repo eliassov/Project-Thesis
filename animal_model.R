@@ -228,6 +228,28 @@ dataset <- list(
 
 
 
+tomonitor <- c('beta', 'var_A', 'var_E', 'var_R', 'var_P', 'heritability')
+
+
+
+
+
+# Call Stan from R
+out_1 <- stan(file = 'animal_model_univariate.stan',
+              data = dataset,
+              pars = tomonitor,
+              chains = nc, iter = ni, warmup = nw, thin = nt,
+              open_progress = FALSE,
+              seed = 123) # Change seed if needed
+
+
+saveRDS(out_1, file = "Output_Univariate_Animal_Model.rds")
+summ_uni <- summary(out_1)$summary
+write.csv(as.data.frame(summ_uni), "Output_Univariate_Summary.csv", row.names = FALSE)
+
+
+cat("Summary written to: Output_Univariate_Summary.csv\n")
+
 
 
 
@@ -370,32 +392,6 @@ dataset <- list(
 
 
 
-
-
-
-
-
-tomonitor <- c('beta', 'var_A', 'var_E', 'var_R', 'var_P', 'heritability')
-
-
-
-
-
-# Call Stan from R
-out_1 <- stan(file = 'C:\\Users\\Elias Ovesen\\OneDrive\\Skrivebord\\Prosjektoppgave\\animal_model_univariate.stan',
-            data = dataset,
-            pars = tomonitor,
-            chains = nc, iter = ni, warmup = nw, thin = nt,
-            open_progress = FALSE,
-            seed = 123) # Change seed if needed
-
-
-saveRDS(out_1, file = "Output_Univariate_Animal_Model.rds")
-summ_uni <- summary(out_1)$summary
-write.csv(as.data.frame(summ_uni), "Output_Univariate_Summary.csv", row.names = FALSE)
-
-
-cat("Summary written to: Output_Univariate_Summary.csv\n")
 
 
 
