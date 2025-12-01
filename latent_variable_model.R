@@ -162,13 +162,13 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
 nc <- 4
-nw <- 3000
-ni <- 6000
+nw <- 4000
+ni <- 8000
 nt <- 1
 
 tomonitor_lv <- c(
   "beta", "lambda", "sd_psi_a", "sd_psi_e", "sd_R", 
-  "var_psi_a", "var_psi_e", "h2_psi", "h2_traits"
+  "var_psi_a", "var_psi_e", "h2_psi", "h2_traits", "h2_traits_no_residual"
 )
 
 out_lv <- stan(file = 'latent_variable_stan.stan',
@@ -225,7 +225,8 @@ posterior_summary <- data.frame(
     "VA_Wing", "VA_Beak",
     "VR_Wing", "VR_Beak",
     "h2_Wing", "h2_Beak",
-    "h2_Latent_Size"
+    "h2_Latent_Size", 
+    "h2_Wing_No_Resid, h2_Beak_No_Resid"
   ),
   Mean = c(
     mean(mu_female_wing), mean(eff_male_wing),
@@ -234,7 +235,8 @@ posterior_summary <- data.frame(
     mean(VA_wing), mean(VA_beak),
     mean(VR_wing), mean(VR_beak),
     mean(samples$h2_traits[,1]), mean(samples$h2_traits[,2]),
-    mean(samples$h2_psi)
+    mean(samples$h2_psi),
+    mean(samples$h2_traits_no_residual[,1]), mean(samples$h2_traits_no_residual[,2])
   ),
   SD = c(
     sd(mu_female_wing), sd(eff_male_wing),
@@ -243,7 +245,8 @@ posterior_summary <- data.frame(
     sd(VA_wing), sd(VA_beak),
     sd(VR_wing), sd(VR_beak),
     sd(samples$h2_traits[,1]), sd(samples$h2_traits[,2]),
-    sd(samples$h2_psi)
+    sd(samples$h2_psi),
+    sd(samples$h2_traits_no_residual[,1]), sd(samples$h2_traits_no_residual[,2])
   )
 )
 
@@ -255,7 +258,8 @@ posterior_summary$Lower_95 <- c(
   quantile(VA_wing, 0.025), quantile(VA_beak, 0.025),
   quantile(VR_wing, 0.025), quantile(VR_beak, 0.025),
   quantile(samples$h2_traits[,1], 0.025), quantile(samples$h2_traits[,2], 0.025),
-  quantile(samples$h2_psi, 0.025)
+  quantile(samples$h2_psi, 0.025),
+  quantile(samples$h2_traits_no_residual[,1], 0.025), quantile(samples$h2_traits_no_residual[,2], 0.025)
 )
 posterior_summary$Upper_95 <- c(
   quantile(mu_female_wing, 0.975), quantile(eff_male_wing, 0.975),
@@ -264,10 +268,11 @@ posterior_summary$Upper_95 <- c(
   quantile(VA_wing, 0.975), quantile(VA_beak, 0.975),
   quantile(VR_wing, 0.975), quantile(VR_beak, 0.975),
   quantile(samples$h2_traits[,1], 0.975), quantile(samples$h2_traits[,2], 0.975),
-  quantile(samples$h2_psi, 0.975)
+  quantile(samples$h2_psi, 0.975),
+  quantile(samples$h2_traits_no_residual[,1], 0.975), quantile(samples$h2_traits_no_residual[,2], 0.975)
 )
 
-write.csv(posterior_summary, "Output_LV_Final_Results.csv", row.names = FALSE)
+write.csv(posterior_summary, "Output_LV_Final_Results.csv", row.names = TRUE)
 print(posterior_summary)
 
 

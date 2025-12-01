@@ -280,10 +280,10 @@ cat("Summary written to: Output_Univariate_Summary.csv\n")
 # fit <- readRDS("Output_Univariate_Animal_Model.rds")
 # 
 # # 3. Check what parameters are actually inside
-# print(names(fit)) 
+# print(names(fit))
 # 
 # # 4. Run Traceplot with 'beta' instead of 'mu'
-# # Note: 'beta' is a vector, so we access specific elements if needed, 
+# # Note: 'beta' is a vector, so we access specific elements if needed,
 # # but usually just 'beta' works to show both.
 # traceplot(fit, pars = c("beta", "var_A", "var_E", "heritability"), inc_warmup = FALSE)
 # 
@@ -291,7 +291,17 @@ cat("Summary written to: Output_Univariate_Summary.csv\n")
 # summary_stats <- summary(fit, pars = c("beta", "var_A", "var_E", "var_R", "var_P", "heritability"))$summary
 # print(summary_stats)
 
-
+# # 1. Load the saved model
+# fit <- readRDS("Output_Univariate_Animal_Model.rds")
+# 
+# # 2. Extract the summary
+# summ_uni <- summary(fit)$summary
+# 
+# # 3. Save the CSV (Make sure the old one is closed!)
+# write.csv(as.data.frame(summ_uni), "Output_Univariate_Summary_Fixed.csv", row.names = TRUE)
+# 
+# # 4. Check Diagnostics
+# print(fit, pars = c("beta", "var_A", "var_E", "heritability"))
 
 # 
 # 
