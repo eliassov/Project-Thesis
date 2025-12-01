@@ -306,6 +306,228 @@ cat("Summary written to: Output_Univariate_Summary.csv\n")
 # 
 # 
 # 
+
+
+
+
+# # Load libraries
+# library(rstan)
+# library(bayesplot)
+# library(ggplot2)
+# library(gridExtra) # For arranging plots
+# 
+# # 1. Load the model object
+# fit <- readRDS("Output_Univariate_Animal_Model.rds")
+# 
+# # ==============================================================================
+# # PLOT A: Variance Components Comparison (Va vs Ve)
+# # ==============================================================================
+# # We extract the samples for Va and Ve
+# posterior_vars <- rstan::extract(fit, pars = c("var_A", "var_E"))
+# df_vars <- data.frame(
+#   Value = c(posterior_vars$var_A, posterior_vars$var_E),
+#   Component = rep(c("Additive Genetic (Va)", "Permanent Env (Ve)"), each = length(posterior_vars$var_A))
+# )
+# 
+# plot_a <- ggplot(df_vars, aes(x = Value, fill = Component)) +
+#   geom_density(alpha = 0.6, color = NA) +
+#   scale_fill_manual(values = c("Additive Genetic (Va)" = "#E69F00", "Permanent Env (Ve)" = "#56B4E9")) +
+#   labs(title = "Comparison of Variance Components",
+#        subtitle = "Permanent Environment explains more variance than Genetics",
+#        x = "Variance Estimate", y = "Posterior Density") +
+#   theme_minimal() +
+#   theme(legend.position = "bottom")
+# 
+# # ==============================================================================
+# # PLOT B: Heritability Posterior
+# # ==============================================================================
+# # Uses bayesplot's built-in area plotter
+# plot_b <- mcmc_areas(fit, 
+#                      pars = "heritability",
+#                      prob = 0.95, # Show 95% Credible Interval
+#                      point_est = "mean") +
+#   ggtitle("Posterior Distribution of Heritability (h^2)") +
+#   theme_minimal()
+# 
+# # ==============================================================================
+# # PLOT C: Sex Effect Density
+# # ==============================================================================
+# # Extract beta[2] samples
+# sex_effect_samples <- rstan::extract(fit, pars = "beta")$beta[,2] # Column 2 is Sex Effect
+# 
+# plot_c <- ggplot(data.frame(Effect = sex_effect_samples), aes(x = Effect)) +
+#   geom_density(fill = "darkred", alpha = 0.7, color = NA) +
+#   geom_vline(xintercept = 0, linetype = "dashed", size = 1) + # The "Zero" line
+#   labs(title = "Sexual Dimorphism (Male - Female)",
+#        subtitle = "Posterior distribution of the fixed effect of Sex",
+#        x = "Difference in Wing Length (mm)", y = "Density") +
+#   annotate("text", x = 0, y = 0.5, label = "Zero Effect", angle = 90, vjust = -0.5) +
+#   theme_minimal()
+# 
+# # ==============================================================================
+# # SAVE PLOTS
+# # ==============================================================================
+# ggsave("Plot_A_Variances.png", plot_a, width = 6, height = 4)
+# ggsave("Plot_B_Heritability.png", plot_b, width = 6, height = 4)
+# ggsave("Plot_C_SexEffect.png", plot_c, width = 6, height = 4)
+# 
+# # View them
+# print(plot_a)
+# print(plot_b)
+# print(plot_c)
+
+
+
+library(ggplot2)
+
+# 1. Create the Data Frame (Manually using your numbers from the output)
+# Replace these numbers with the exact values from your 'Output_Univariate_Summary.csv'
+df_uni_vars <- data.frame(
+  Component = c("Additive Genetic (Va)", "Permanent Env (Ve)", "Residual (Vr)"),
+  Mean = c(0.54, 2.60, 3.31),        # From your previous output
+  Lower = c(0.24, 2.20, 3.14),       # From your previous output
+  Upper = c(0.89, 3.02, 3.48)        # From your previous output
+)
+
+# 2. Plot: Bar Chart with Error Bars
+p_uni_bar <- ggplot(df_uni_vars, aes(x = Component, y = Mean, fill = Component)) +
+  geom_col(alpha = 0.7, width = 0.6, color = "black") + # The Bars
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2, size = 1) + # The Whiskers
+  scale_fill_manual(values = c("#E69F00", "#56B4E9", "#999999")) +
+  labs(title = "Variance Decomposition (Univariate: Wing Length)",
+       y = "Variance Estimate", x = NULL) +
+  theme_minimal() +
+  theme(legend.position = "none", 
+        axis.text.x = element_text(size = 11, face = "bold"))
+
+# Save and View
+ggsave("Plot_Univariate_Variance_Bar.png", p_uni_bar, width = 6, height = 5)
+print(p_uni_bar)
+
+
+
+
+
+# ==============================================================================
+# FIX SUMMARY TABLE
+# ==============================================================================
+
+
+
+
+
+
+
+# library(rstan)
+# library(tidyverse)
+# 
+# # 1. Load the saved model
+# fit <- readRDS("Output_LV_Animal_Model.rds")
+# samples <- rstan::extract(fit)
+# 
+# # 2. Recover Scaling Factors (Re-calculate from data)
+# # We need these to back-transform the standardized results
+# traitData <- read.csv("morphology.txt", sep = ";", na.strings = c("NA", ""))
+# trait_subset <- traitData %>% 
+#   filter(sted_r == "hestmannøy", !is.na(ving_h), !is.na(nebb_l)) %>%
+#   filter(!is.na(scriptsex) | !is.na(fieldsex)) # Rough filter to get approx SD
+# 
+# # Calculate the SDs used in standardization
+# mean_wing <- mean(trait_subset$ving_h, na.rm = TRUE)
+# sd_wing   <- sd(trait_subset$ving_h, na.rm = TRUE)
+# mean_beak <- mean(trait_subset$nebb_l, na.rm = TRUE)
+# sd_beak   <- sd(trait_subset$nebb_l, na.rm = TRUE)
+# 
+# # 3. Calculate Posterior Distributions (Back-transformed)
+# 
+# # --- A. Fixed Effects (Means) ---
+# # beta[iteration, predictor, trait]
+# # Predictor 1 = Intercept (Female), Predictor 2 = Sex (Male Effect)
+# # ... (Steps 1 and 2 remain the same) ...
+# 
+# # 3. Calculate Posterior Distributions (Back-transformed)
+# 
+# # --- A. Fixed Effects (Means) ---
+# # beta[iteration, predictor, trait]
+# # Predictor 1 = Intercept (Female), Predictor 2 = Sex (Male Effect)
+# mu_female_wing <- samples$beta[,,1][,1] * sd_wing + mean_wing
+# eff_male_wing  <- samples$beta[,,1][,2] * sd_wing
+# 
+# mu_female_beak <- samples$beta[,,2][,1] * sd_beak + mean_beak
+# eff_male_beak  <- samples$beta[,,2][,2] * sd_beak
+# 
+# # --- B. Loadings ---
+# loading_wing <- samples$lambda[,1]
+# loading_beak <- samples$lambda[,2]
+# 
+# # --- C. Variance Components (Original Scale) ---
+# VA_wing   <- samples$lambda[,1]^2 * samples$h2_psi * sd_wing^2
+# VA_beak   <- samples$lambda[,2]^2 * samples$h2_psi * sd_beak^2
+# VR_wing   <- samples$sd_R[,1]^2 * sd_wing^2
+# VR_beak   <- samples$sd_R[,2]^2 * sd_beak^2
+# 
+# # --- D. Create the Data Frame ---
+# # We define the list of values
+# values_list <- list(
+#   mu_female_wing, eff_male_wing,
+#   mu_female_beak, eff_male_beak,
+#   loading_wing, loading_beak,
+#   VA_wing, VA_beak,
+#   VR_wing, VR_beak,
+#   samples$h2_traits[,1], samples$h2_traits[,2],
+#   samples$h2_traits_no_residual[,1], samples$h2_traits_no_residual[,2],
+#   samples$h2_psi
+# )
+# 
+# # Create the summary table with na.rm = TRUE
+# posterior_summary <- data.frame(
+#   Parameter = c(
+#     "Female_Mean_Wing", "Male_Effect_Wing",
+#     "Female_Mean_Beak", "Male_Effect_Beak",
+#     "Loading_Wing", "Loading_Beak",
+#     "VA_Wing", "VA_Beak",
+#     "VR_Wing", "VR_Beak",
+#     "h2_Wing", "h2_Beak",
+#     "h2_Wing_Indiv_Only", "h2_Beak_Indiv_Only",
+#     "h2_Latent_Size"
+#   ),
+#   Mean = sapply(values_list, mean, na.rm = TRUE),
+#   SD   = sapply(values_list, sd, na.rm = TRUE),
+#   Lower_95 = sapply(values_list, quantile, probs = 0.025, na.rm = TRUE),
+#   Upper_95 = sapply(values_list, quantile, probs = 0.975, na.rm = TRUE)
+# )
+# 
+# # 4. Save it
+# write.csv(posterior_summary, "Output_LV_Final_Results.csv", row.names = FALSE)
+# print(posterior_summary)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # 
 # # GET ONLY THE BIRDS FROM HESTMANNØY (that are phenotyped)
 # 

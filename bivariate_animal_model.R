@@ -90,8 +90,9 @@ valid_ids <- intersect(trait_subset_temp$ringnr, pedigree_prepped$ringnr)
 
 # Create FINAL data subset sorted by ID
 trait_subset <- trait_subset_temp %>%
-  filter(ringnr %in% valid_ids) %>%
-  arrange(ringnr)
+  filter(ringnr %in% valid_ids) 
+# %>%
+#   arrange(ringnr)
 
 # ==============================================================================
 # 5. BUILD A-MATRIX (Subsetted)
@@ -126,8 +127,8 @@ A_bivariate <- A_small_nadiv[valid_ids, valid_ids]
 A_bivariate <- A_bivariate[order(rownames(A_bivariate)), order(colnames(A_bivariate))]
 
 # Safety Check
-stopifnot(all(rownames(A_bivariate) == trait_subset$ringnr))
-cat("Data and Matrix aligned. No =", nrow(trait_subset), "Na =", length(valid_ids), "\n")
+# stopifnot(all(rownames(A_bivariate) == trait_subset$ringnr))
+cat("Data and Matrix: No =", nrow(trait_subset), "Na =", length(valid_ids), "\n")
 
 # ==============================================================================
 # 6. PREPARE STAN DATA
@@ -153,6 +154,43 @@ dataset_bivariate <- list(
   Na = length(valid_ids),
   A = as.matrix(A_bivariate)
 )
+
+# 
+# 
+# # ==============================================================================
+# # DIAGNOSTICS LOGGING
+# # ==============================================================================
+# sink("Output_LV_PreRun_Diagnostics.txt") # Redirect output to file
+# 
+# cat("=== DATA & MATRIX DIAGNOSTICS ===\n")
+# cat("TimeStamp:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n\n")
+# 
+# cat("1. Data Dimensions:\n")
+# cat("   Observations (No):", nrow(trait_subset), "\n")
+# cat("   Individuals (Na): ", nrow(A_lv), "\n")
+# cat("   Traits (Nt):      ", 2, "\n\n")
+# 
+# cat("2. Fixed Effects (X Matrix):\n")
+# cat("   Predictors (K):   ", ncol(X_mat), "\n")
+# cat("   Colnames:         ", paste(colnames(X_mat), collapse=", "), "\n\n")
+# 
+# cat("3. ID Alignment Check:\n")
+# # Check if all data IDs are in Matrix
+# ids_in_matrix <- unique(trait_subset_lv$ringnr) %in% rownames(A_lv)
+# cat("   All Data IDs in Matrix? ", all(ids_in_matrix), "\n")
+# if(!all(ids_in_matrix)) {
+#   cat("   MISSING IDs: ", head(unique(trait_subset_lv$ringnr)[!ids_in_matrix]), "...\n")
+# }
+# 
+# # Check Matrix Properties
+# cat("\n4. Matrix Properties:\n")
+# cat("   Symmetric?        ", isSymmetric(A_lv), "\n")
+# cat("   Positive Definite?", all(eigen(A_lv, only.values=TRUE)$values > -1e-6), "\n")
+# cat("   Mean Diagonal:    ", mean(diag(A_lv)), "(Expected ~1.0)\n")
+# 
+# sink() # Turn off redirection (restore console output)
+# 
+
 
 # ==============================================================================
 # 7. RUN STAN

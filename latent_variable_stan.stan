@@ -1,13 +1,10 @@
 
 
-
-
 data {
   int<lower=1> No; 
   int<lower=1> Nt; 
   matrix[No, Nt] Y; 
   
-  // NEW
   int<lower=1> K;
   matrix[No, K] X;
 
@@ -15,52 +12,57 @@ data {
   int<lower=1> Na; 
   cov_matrix[Na] A; 
 }
+
 transformed data {
   matrix[Na, Na] LA = cholesky_decompose(A);
 }
+
 parameters {
-  // NEW: Matrix of fixed effects (K predictors x Nt traits)
-  // Replaces 'vector[Nt] mu'
+  // Fixed effects
   matrix[K, Nt] beta;  
 
-  // ... (Lambda and SD parameters unchanged) ...
+  // Loadings (All estimated, first constrained positive)
   vector[Nt-1] lambda_free;
   real<lower=0> lambda1;
+  
+  // Residual SDs for traits
   vector<lower=0>[Nt] sd_R; 
-  real<lower=0> sd_psi_a; 
-  real<lower=0> sd_psi_e; 
+
+  // Latent Variable Properties (The Fix!)
+  // We estimate h2 directly. This constrains Total Var(psi) = 1.
+  real<lower=0, upper=1> h2_psi; 
+
+  // Standardized Random Effects
   vector[Na] psi_a_std; 
   vector[Na] psi_e_std; 
 }
 
-
-
-
 transformed parameters {
-  // Construct the Lambda Vector
   vector[Nt] lambda;
+  vector[Na] psi_a;
+  vector[Na] psi_e;
+  vector[Na] psi;
+  matrix[No, Nt] eta;
+  matrix[No, Nt] fixed_part;
+
+  // 1. Construct Lambda
   lambda[1] = lambda1;
-  lambda[2:Nt] = lambda_free;
+  for(t in 2:Nt) lambda[t] = lambda_free[t-1];
 
-  // CONSTRUCT THE LATENT VARIABLE
-  // Instead of "psi_std = psi / sd(psi)", we build it to have variance 1 automatically.
-  // Genetic part: scales with sqrt(h2)
-  // Environmental part: scales with sqrt(1 - h2)
+  // 2. Construct Latent Variable (Using h2_psi)
+  // Genetic part scales with sqrt(h2)
+  // Environmental part scales with sqrt(1-h2)
+  psi_a = sqrt(h2_psi) * (LA * psi_a_std); 
+  psi_e = sqrt(1 - h2_psi) * psi_e_std; 
   
-  vector[Na] psi_a = sqrt(h2_psi) * (LA * psi_a_std); 
-  vector[Na] psi_e = sqrt(1 - h2_psi) * psi_e_std;
-  
-  // Total Psi. Variance = h2 + (1-h2) = 1. 
-  vector[Na] psi = psi_a + psi_e;
+  // Total Psi has variance = h2 + (1-h2) = 1
+  psi = psi_a + psi_e;
 
-  matrix[No, Nt] eta; 
-  
-  // Calculate fixed part: (No x K) * (K x Nt) = (No x Nt)
-  matrix[No, Nt] fixed_part = X * beta;
+  // 3. Compute Expected Values
+  fixed_part = X * beta;
 
   for (o in 1:No) {
     for (t in 1:Nt) {
-      // Fixed effect + (Loading * Latent Factor)
       eta[o,t] = fixed_part[o,t] + lambda[t] * psi[animal[o]];
     }
   }
@@ -68,13 +70,14 @@ transformed parameters {
 
 model {
   // Priors
-  to_vector(beta) ~ normal(0, 1); // Standardized scale, so N(0,1) is fine
-  
-  // ... (Other priors unchanged) ...
-  lambda ~ normal(0, 1);
+  to_vector(beta) ~ normal(0, 1);
+  lambda1 ~ normal(0, 1);
+  lambda_free ~ normal(0, 1);
   sd_R ~ exponential(1);
-  sd_psi_a ~ exponential(1);
-  sd_psi_e ~ exponential(1);
+  
+  // h2_psi has an implicit Uniform(0,1) prior, which is fine.
+  // Alternatively: h2_psi ~ beta(2, 2); 
+  
   psi_a_std ~ normal(0, 1);
   psi_e_std ~ normal(0, 1);
   
@@ -84,26 +87,136 @@ model {
   }
 }
 
-
-
-
-
-
 generated quantities {
-  real var_psi_a = square(sd_psi_a);  // LV genetic variance
-  real var_psi_e = square(sd_psi_e);  // LV residual variance
-  real h2_psi = var_psi_a / (var_psi_a + var_psi_e);  // LV heritability
-  vector[Nt] h2_traits;  // Trait-specific heritabilities
-  for (t in 1:Nt) {
-    h2_traits[t] = lambda[t]^2 * var_psi_a / (lambda[t]^2 * (var_psi_a + var_psi_e) + sd_R[t]^2);
-  }
+  // Back-calculate variances for reporting
+  real var_psi_a = h2_psi;
+  real var_psi_e = 1 - h2_psi;
+  
+  // Calculate SDs if you need them for the R summary script
+  real sd_psi_a = sqrt(var_psi_a);
+  real sd_psi_e = sqrt(var_psi_e);
+
+  vector[Nt] h2_traits; 
   vector[Nt] h2_traits_no_residual;
+  
   for (t in 1:Nt) {
-  real denom = lambda[t]^2 * (var_psi_a + var_psi_e);
-  h2_traits_no_residual[t] = (lambda[t]^2 * var_psi_a) / denom;
-}
+    // V_A(trait) = lambda^2 * V_A(psi)
+    // V_P(trait) = lambda^2 * V_P(psi) + V_R(trait)
+    // Since V_P(psi) = 1:
+    real va_trait = square(lambda[t]) * h2_psi;
+    real vp_trait = square(lambda[t]) * 1.0 + square(sd_R[t]);
+    
+    h2_traits[t] = va_trait / vp_trait;
+    
+    // Heritability ignoring residual (ratio of individual variance that is genetic)
+    h2_traits_no_residual[t] = va_trait / square(lambda[t]);
+  }
 }
 
+
+// 
+// data {
+//   int<lower=1> No; 
+//   int<lower=1> Nt; 
+//   matrix[No, Nt] Y; 
+//   
+//   // NEW
+//   int<lower=1> K;
+//   matrix[No, K] X;
+// 
+//   array[No] int animal; 
+//   int<lower=1> Na; 
+//   cov_matrix[Na] A; 
+// }
+// transformed data {
+//   matrix[Na, Na] LA = cholesky_decompose(A);
+// }
+// parameters {
+//   // NEW: Matrix of fixed effects (K predictors x Nt traits)
+//   // Replaces 'vector[Nt] mu'
+//   matrix[K, Nt] beta;  
+// 
+//   // ... (Lambda and SD parameters unchanged) ...
+//   vector[Nt-1] lambda_free;
+//   real<lower=0> lambda1;
+//   vector<lower=0>[Nt] sd_R; 
+//   real<lower=0> sd_psi_a; 
+//   real<lower=0> sd_psi_e; 
+//   vector[Na] psi_a_std; 
+//   vector[Na] psi_e_std; 
+// }
+// 
+// 
+// 
+// 
+// transformed parameters {
+//   // Construct the Lambda Vector
+//   vector[Nt] lambda;
+//   lambda[1] = lambda1;
+//   lambda[2:Nt] = lambda_free;
+// 
+//   // CONSTRUCT THE LATENT VARIABLE
+//   // Instead of "psi_std = psi / sd(psi)", we build it to have variance 1 automatically.
+//   // Genetic part: scales with sqrt(h2)
+//   // Environmental part: scales with sqrt(1 - h2)
+//   
+//   vector[Na] psi_a = sqrt(h2_psi) * (LA * psi_a_std); 
+//   vector[Na] psi_e = sqrt(1 - h2_psi) * psi_e_std;
+//   
+//   // Total Psi. Variance = h2 + (1-h2) = 1. 
+//   vector[Na] psi = psi_a + psi_e;
+// 
+//   matrix[No, Nt] eta; 
+//   
+//   // Calculate fixed part: (No x K) * (K x Nt) = (No x Nt)
+//   matrix[No, Nt] fixed_part = X * beta;
+// 
+//   for (o in 1:No) {
+//     for (t in 1:Nt) {
+//       // Fixed effect + (Loading * Latent Factor)
+//       eta[o,t] = fixed_part[o,t] + lambda[t] * psi[animal[o]];
+//     }
+//   }
+// }
+// 
+// model {
+//   // Priors
+//   to_vector(beta) ~ normal(0, 1); // Standardized scale, so N(0,1) is fine
+//   
+//   // ... (Other priors unchanged) ...
+//   lambda ~ normal(0, 1);
+//   sd_R ~ exponential(1);
+//   sd_psi_a ~ exponential(1);
+//   sd_psi_e ~ exponential(1);
+//   psi_a_std ~ normal(0, 1);
+//   psi_e_std ~ normal(0, 1);
+//   
+//   // Likelihood
+//   for (o in 1:No) {
+//     Y[o] ~ normal(eta[o], sd_R);
+//   }
+// }
+
+
+
+// 
+// 
+// 
+// generated quantities {
+//   real var_psi_a = square(sd_psi_a);  // LV genetic variance
+//   real var_psi_e = square(sd_psi_e);  // LV residual variance
+//   real h2_psi = var_psi_a / (var_psi_a + var_psi_e);  // LV heritability
+//   vector[Nt] h2_traits;  // Trait-specific heritabilities
+//   for (t in 1:Nt) {
+//     h2_traits[t] = lambda[t]^2 * var_psi_a / (lambda[t]^2 * (var_psi_a + var_psi_e) + sd_R[t]^2);
+//   }
+//   vector[Nt] h2_traits_no_residual;
+//   for (t in 1:Nt) {
+//   real denom = lambda[t]^2 * (var_psi_a + var_psi_e);
+//   h2_traits_no_residual[t] = (lambda[t]^2 * var_psi_a) / denom;
+// }
+// }
+// 
 
 
 // data {

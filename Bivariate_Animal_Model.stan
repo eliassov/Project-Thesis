@@ -90,11 +90,12 @@ transformed parameters {
   matrix[2, Na] alpha;  // Raw additive genetic effects
   matrix[2, Na] gamma;  // Raw permanent effects  matrix[2, 2] Sigma_A = diag_pre_multiply(sd_A, L_A) * diag_pre_multiply(sd_A, L_A)';
 
-  matrix[2, 2] Sigma_E = diag_pre_multiply(sd_E, L_E) * diag_pre_multiply(sd_E, L_E)';
-  matrix[2, 2] Sigma_R = diag_pre_multiply(sd_R, L_R) * diag_pre_multiply(sd_R, L_R)';
+  Sigma_A = diag_pre_multiply(sd_A, L_A) * diag_pre_multiply(sd_A, L_A)';
+  Sigma_E = diag_pre_multiply(sd_E, L_E) * diag_pre_multiply(sd_E, L_E)';
+  Sigma_R = diag_pre_multiply(sd_R, L_R) * diag_pre_multiply(sd_R, L_R)';
 
-  matrix[2, Na] alpha = diag_pre_multiply(sd_A, L_A) * alpha_std * LA';
-  matrix[2, Na] gamma = diag_pre_multiply(sd_E, L_E) * gamma_std;
+  alpha = diag_pre_multiply(sd_A, L_A) * alpha_std * LA';
+  gamma = diag_pre_multiply(sd_E, L_E) * gamma_std;
 }
 
 
