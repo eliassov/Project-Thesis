@@ -160,6 +160,21 @@ trait_subset <- trait_subset_temp %>%
 # 3. BUILD A-MATRIX (Using only the Valid IDs)
 # ==============================================================================
 
+
+get_ancestors <- function(ids, pedigree) {
+  ancestors <- ids
+  to_process <- ids
+  while (length(to_process) > 0) {
+    parents <- unique(c(pedigree$dam[pedigree$ringnr %in% to_process], 
+                        pedigree$sire[pedigree$ringnr %in% to_process]))
+    parents <- parents[!parents %in% ancestors & !is.na(parents)]
+    ancestors <- c(ancestors, parents)
+    to_process <- parents
+  }
+  return(ancestors)
+}
+
+
 # Get ancestry for ONLY the valid individuals
 # (Reuse your existing get_ancestors function)
 all_relevant_ids <- get_ancestors(valid_phenotyped_ids, pedigree_prepped)
