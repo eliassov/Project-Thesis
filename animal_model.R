@@ -241,11 +241,17 @@ dataset <- list(
 
 
 
-
-
 tomonitor <- c('beta', 'var_A', 'var_E', 'var_R', 'var_P', 'heritability')
 
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
 
+
+# MCMC settings
+nc <- 4    # Number of Chains
+nw <- 1000 # Warmup iterations
+ni <- 2000 # Total iterations
+nt <- 1    # Thinning
 
 
 

@@ -176,3 +176,6 @@ generated quantities {
     var_P = var_A + var_E + var_R;
     heritability = var_A / var_P;
 }
+
+
+

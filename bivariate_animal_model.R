@@ -157,7 +157,6 @@ dataset_bivariate <- list(
 # ==============================================================================
 # 7. RUN STAN
 # ==============================================================================
-library(rstan)
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
