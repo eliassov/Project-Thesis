@@ -28,8 +28,7 @@ parameters {
   // Residual SDs for traits
   vector<lower=0>[Nt] sd_R; 
 
-  // Latent Variable Properties (The Fix!)
-  // We estimate h2 directly. This constrains Total Var(psi) = 1.
+  // We estimate h2 directly. This constrains total var(psi) = 1
   real<lower=0, upper=1> h2_psi; 
 
   // Standardized Random Effects
@@ -45,20 +44,20 @@ transformed parameters {
   matrix[No, Nt] eta;
   matrix[No, Nt] fixed_part;
 
-  // 1. Construct Lambda
+  // Construct lambda
   lambda[1] = lambda1;
   for(t in 2:Nt) lambda[t] = lambda_free[t-1];
 
-  // 2. Construct Latent Variable (Using h2_psi)
+  // Construct latent variable (Using h2_psi)
   // Genetic part scales with sqrt(h2)
   // Environmental part scales with sqrt(1-h2)
   psi_a = sqrt(h2_psi) * (LA * psi_a_std); 
   psi_e = sqrt(1 - h2_psi) * psi_e_std; 
   
-  // Total Psi has variance = h2 + (1-h2) = 1
+  // Total psi has variance = h2 + (1-h2) = 1
   psi = psi_a + psi_e;
 
-  // 3. Compute Expected Values
+  // Compute expected values
   fixed_part = X * beta;
 
   for (o in 1:No) {
@@ -75,24 +74,20 @@ model {
   lambda_free ~ normal(0, 1);
   sd_R ~ exponential(1);
   
-  // h2_psi has an implicit Uniform(0,1) prior, which is fine.
-  // Alternatively: h2_psi ~ beta(2, 2); 
-  
+  // h2_psi has an implicit uniform(0,1) prior
+
   psi_a_std ~ normal(0, 1);
   psi_e_std ~ normal(0, 1);
   
-  // Likelihood
   for (o in 1:No) {
     Y[o] ~ normal(eta[o], sd_R);
   }
 }
 
 generated quantities {
-  // Back-calculate variances for reporting
   real var_psi_a = h2_psi;
   real var_psi_e = 1 - h2_psi;
   
-  // Calculate SDs if you need them for the R summary script
   real sd_psi_a = sqrt(var_psi_a);
   real sd_psi_e = sqrt(var_psi_e);
 
