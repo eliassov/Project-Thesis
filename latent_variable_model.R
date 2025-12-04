@@ -218,9 +218,9 @@ out_lv <- stan(file = 'latent_variable_stan.stan',
                open_progress = FALSE,
                seed = 123)
 
-saveRDS(out_lv, 'Output_LV_Animal_Model.rds')
+saveRDS(out_lv, 'Output_LV_Animal_Model_Correct_Sorting.rds')
 summ_lv <- summary(out_lv)$summary
-write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary.csv", row.names = TRUE)
+write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary_Correct_Sorting.csv", row.names = TRUE)
 
 
 # BACK TRANSFORMATION 
@@ -301,5 +301,5 @@ posterior_summary$Upper_95 <- c(
   quantile(samples$h2_psi, 0.975),
 )
 
-write.csv(posterior_summary, "Output_LV_Final_Results.csv", row.names = TRUE)
+write.csv(posterior_summary, "Output_LV_Final_Results_Correct_Sorting.csv", row.names = TRUE)
 print(posterior_summary)
