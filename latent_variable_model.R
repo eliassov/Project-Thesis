@@ -202,13 +202,13 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
 nc <- 4
-nw <- 4000
-ni <- 8000
+nw <- 5000
+ni <- 10000
 nt <- 1
 
 tomonitor_lv <- c(
   "beta", "lambda", "sd_psi_a", "sd_psi_e", "sd_R", 
-  "var_psi_a", "var_psi_e", "h2_psi", "h2_traits", "h2_traits_no_residual"
+  "var_psi_a", "var_psi_e", "h2_psi", "h2_traits"
 )
 
 out_lv <- stan(file = 'latent_variable_stan.stan',
@@ -226,7 +226,7 @@ write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary_Correct_Sorting.csv"
 # BACK TRANSFORMATION 
 samples <- rstan::extract(out_lv)
 
-# --- Fixed Effects (Means) ---
+# Fixed effects (means):
 # beta[sample, predictor, trait]
 # predictor 1 = Intercept (female mean)
 # predictor 2 = Sexm (male effect)
@@ -268,7 +268,7 @@ posterior_summary <- data.frame(
     mean(VA_wing), mean(VA_beak),
     mean(VR_wing), mean(VR_beak),
     mean(samples$h2_traits[,1]), mean(samples$h2_traits[,2]),
-    mean(samples$h2_psi),
+    mean(samples$h2_psi)
   ),
   SD = c(
     sd(mu_female_wing), sd(eff_male_wing),
@@ -277,7 +277,7 @@ posterior_summary <- data.frame(
     sd(VA_wing), sd(VA_beak),
     sd(VR_wing), sd(VR_beak),
     sd(samples$h2_traits[,1]), sd(samples$h2_traits[,2]),
-    sd(samples$h2_psi),
+    sd(samples$h2_psi)
   )
 )
 
@@ -289,7 +289,7 @@ posterior_summary$Lower_95 <- c(
   quantile(VA_wing, 0.025), quantile(VA_beak, 0.025),
   quantile(VR_wing, 0.025), quantile(VR_beak, 0.025),
   quantile(samples$h2_traits[,1], 0.025), quantile(samples$h2_traits[,2], 0.025),
-  quantile(samples$h2_psi, 0.025),
+  quantile(samples$h2_psi, 0.025)
 )
 posterior_summary$Upper_95 <- c(
   quantile(mu_female_wing, 0.975), quantile(eff_male_wing, 0.975),
@@ -298,7 +298,7 @@ posterior_summary$Upper_95 <- c(
   quantile(VA_wing, 0.975), quantile(VA_beak, 0.975),
   quantile(VR_wing, 0.975), quantile(VR_beak, 0.975),
   quantile(samples$h2_traits[,1], 0.975), quantile(samples$h2_traits[,2], 0.975),
-  quantile(samples$h2_psi, 0.975),
+  quantile(samples$h2_psi, 0.975)
 )
 
 write.csv(posterior_summary, "Output_LV_Final_Results_Correct_Sorting.csv", row.names = TRUE)

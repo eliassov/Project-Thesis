@@ -48,7 +48,7 @@ transformed parameters {
   lambda[1] = lambda1;
   for(t in 2:Nt) lambda[t] = lambda_free[t-1];
 
-  // Construct latent variable (Using h2_psi)
+  // Construct latent variable (using h2_psi)
   // Genetic part scales with sqrt(h2)
   // Environmental part scales with sqrt(1-h2)
   psi_a = sqrt(h2_psi) * (LA * psi_a_std); 
@@ -60,17 +60,23 @@ transformed parameters {
   // Compute expected values
   fixed_part = X * beta;
 
-  for (o in 1:No) {
-    for (t in 1:Nt) {
-      eta[o,t] = fixed_part[o,t] + lambda[t] * psi[animal[o]];
-    }
-  }
+  // for (o in 1:No) {
+  //   for (t in 1:Nt) {
+  //     eta[o,t] = fixed_part[o,t] + lambda[t] * psi[animal[o]];
+  //   }
+  // }
+  
+  
+  // psi[animal] is a vector of length No
+  // lambda' is row_vector of length Nt (2)
+  // The product is a No x Nt matrix
+  eta = fixed_part + psi[animal] * lambda';
 }
 
 model {
   // Priors
   to_vector(beta) ~ normal(0, 1);
-  lambda1 ~ normal(0, 1);
+  lambda1 ~ lognormal(0, 1);
   lambda_free ~ normal(0, 1);
   sd_R ~ exponential(1);
   
@@ -79,9 +85,11 @@ model {
   psi_a_std ~ normal(0, 1);
   psi_e_std ~ normal(0, 1);
   
-  for (o in 1:No) {
-    Y[o] ~ normal(eta[o], sd_R);
-  }
+  // for (o in 1:No) {
+  //   Y[o] ~ normal(eta[o], sd_R);
+  // }
+  
+  to_vector(Y) ~ normal(to_vector(eta), to_vector(rep_matrix(sd_R', No)));
 }
 
 generated quantities {
