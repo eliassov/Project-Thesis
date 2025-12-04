@@ -127,19 +127,19 @@ smaller_ped_prepped <- prepPed(smaller_pedigree, gender = NULL, check = TRUE)
 A_small_nadiv <- makeA(smaller_ped_prepped)
 
 # Subset A to valid phenotyped individuals
-A_lv <- A_small_nadiv[valid_ids, valid_ids]
+A_hestmannoy <- A_small_nadiv[valid_ids, valid_ids]
 
 # Safety check
-if (!all(unique(trait_subset_lv$ringnr) %in% rownames(A_lv))) {
+if (!all(unique(trait_subset_lv$ringnr) %in% rownames(A_hestmannoy))) {
   stop("Error: Data contains individuals not in the A-matrix!")
 }
-cat("Data and Matrix aligned. No =", nrow(trait_subset_lv), "Na =", nrow(A_lv), "\n")
+cat("Data and Matrix aligned. No =", nrow(trait_subset_lv), "Na =", nrow(A_hestmannoy), "\n")
 
 
 # PREPARE STAN DATA
 
 # Map animals to integers 1:Na based on the sorted matrix
-matrix_ids <- rownames(A_lv)
+matrix_ids <- rownames(A_hestmannoy)
 animal_map <- setNames(seq_len(length(matrix_ids)), matrix_ids)
 animal_idx <- animal_map[trait_subset_lv$ringnr]
 
@@ -155,7 +155,7 @@ dataset_lv <- list(
   K = K,
   animal = animal_idx,
   Na = length(matrix_ids),
-  A = as.matrix(A_lv)
+  A = as.matrix(A_hestmannoy)
 )
 
 
@@ -170,7 +170,7 @@ cat("TimeStamp:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n\n")
 
 cat("1. Data Dimensions:\n")
 cat("   Observations (No):", nrow(trait_subset_lv), "\n")
-cat("   Individuals (Na): ", nrow(A_lv), "\n")
+cat("   Individuals (Na): ", nrow(A_hestmannoy), "\n")
 cat("   Traits (Nt):      ", 2, "\n\n")
 
 cat("2. Fixed Effects (X Matrix):\n")
@@ -178,18 +178,18 @@ cat("   Predictors (K):   ", ncol(X_mat), "\n")
 cat("   Colnames:         ", paste(colnames(X_mat), collapse=", "), "\n\n")
 
 cat("3. ID Alignment Check:\n")
-# Check if all data IDs are in Matrix
-ids_in_matrix <- unique(trait_subset_lv$ringnr) %in% rownames(A_lv)
+# Check if all data IDs are in matrix
+ids_in_matrix <- unique(trait_subset_lv$ringnr) %in% rownames(A_hestmannoy)
 cat("   All Data IDs in Matrix? ", all(ids_in_matrix), "\n")
 if(!all(ids_in_matrix)) {
   cat("   MISSING IDs: ", head(unique(trait_subset_lv$ringnr)[!ids_in_matrix]), "...\n")
 }
 
-# Check Matrix Properties
+# Check matrix properties
 cat("\n4. Matrix Properties:\n")
-cat("   Symmetric?        ", isSymmetric(A_lv), "\n")
-cat("   Positive Definite?", all(eigen(A_lv, only.values=TRUE)$values > -1e-6), "\n")
-cat("   Mean Diagonal:    ", mean(diag(A_lv)), "(Expected ~1.0)\n")
+cat("   Symmetric?        ", isSymmetric(A_hestmannoy), "\n")
+cat("   Positive Definite?", all(eigen(A_hestmannoy, only.values=TRUE)$values > -1e-6), "\n")
+cat("   Mean Diagonal:    ", mean(diag(A_hestmannoy)), "(Expected ~1.0)\n")
 
 sink() # Turn off redirection (restore console output)
 
@@ -213,7 +213,7 @@ tomonitor_lv <- c(
 
 out_lv <- stan(file = 'latent_variable_stan.stan',
                data = dataset_lv,
-               #pars = tomonitor_lv,
+               #pars = tomonitor_lv,  # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
                chains = nc, iter = ni, warmup = nw, thin = nt,
                open_progress = FALSE,
                seed = 123)
@@ -223,7 +223,7 @@ summ_lv <- summary(out_lv)$summary
 write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary.csv", row.names = TRUE)
 
 
-# 8. BACK-TRANSFORMATION 
+# BACK TRANSFORMATION 
 samples <- rstan::extract(out_lv)
 
 # --- Fixed Effects (Means) ---
@@ -239,12 +239,12 @@ eff_male_wing  <- samples$beta[,,1][,2] * sd_wing # Differences scale with SD on
 mu_female_beak <- samples$beta[,,2][,1] * sd_beak + mean_beak
 eff_male_beak  <- samples$beta[,,2][,2] * sd_beak
 
-# --- Loadings ---
+# Loadings
 loading_wing <- samples$lambda[,1]
 loading_beak <- samples$lambda[,2]
 
-# --- Variance Components (Unscaled) ---
-# Note: h2_psi approach puts variance into lambda scaling
+# Variance components (unscaled)
+# h2_psi approach puts variance into lambda scaling
 VA_wing   <- samples$lambda[,1]^2 * samples$var_psi_a * sd_wing^2
 VA_beak   <- samples$lambda[,2]^2 * samples$var_psi_a * sd_beak^2
 VR_wing   <- samples$sd_R[,1]^2 * sd_wing^2
@@ -259,8 +259,7 @@ posterior_summary <- data.frame(
     "VA_Wing", "VA_Beak",
     "VR_Wing", "VR_Beak",
     "h2_Wing", "h2_Beak",
-    "h2_Latent_Size", 
-    "h2_Wing_No_Resid, h2_Beak_No_Resid"
+    "h2_Latent_Size"
   ),
   Mean = c(
     mean(mu_female_wing), mean(eff_male_wing),
@@ -270,7 +269,6 @@ posterior_summary <- data.frame(
     mean(VR_wing), mean(VR_beak),
     mean(samples$h2_traits[,1]), mean(samples$h2_traits[,2]),
     mean(samples$h2_psi),
-    mean(samples$h2_traits_no_residual[,1]), mean(samples$h2_traits_no_residual[,2])
   ),
   SD = c(
     sd(mu_female_wing), sd(eff_male_wing),
@@ -280,7 +278,6 @@ posterior_summary <- data.frame(
     sd(VR_wing), sd(VR_beak),
     sd(samples$h2_traits[,1]), sd(samples$h2_traits[,2]),
     sd(samples$h2_psi),
-    sd(samples$h2_traits_no_residual[,1]), sd(samples$h2_traits_no_residual[,2])
   )
 )
 
@@ -293,7 +290,6 @@ posterior_summary$Lower_95 <- c(
   quantile(VR_wing, 0.025), quantile(VR_beak, 0.025),
   quantile(samples$h2_traits[,1], 0.025), quantile(samples$h2_traits[,2], 0.025),
   quantile(samples$h2_psi, 0.025),
-  quantile(samples$h2_traits_no_residual[,1], 0.025), quantile(samples$h2_traits_no_residual[,2], 0.025)
 )
 posterior_summary$Upper_95 <- c(
   quantile(mu_female_wing, 0.975), quantile(eff_male_wing, 0.975),
@@ -303,7 +299,6 @@ posterior_summary$Upper_95 <- c(
   quantile(VR_wing, 0.975), quantile(VR_beak, 0.975),
   quantile(samples$h2_traits[,1], 0.975), quantile(samples$h2_traits[,2], 0.975),
   quantile(samples$h2_psi, 0.975),
-  quantile(samples$h2_traits_no_residual[,1], 0.975), quantile(samples$h2_traits_no_residual[,2], 0.975)
 )
 
 write.csv(posterior_summary, "Output_LV_Final_Results.csv", row.names = TRUE)

@@ -108,6 +108,7 @@ trait_subset_temp <- traitData %>%
   # Island and traits
   filter(sted_r == "hestmannøy", 
          !is.na(ving_h)) %>%
+         !is.na(nebb_l) %>% # Added this filter so that it is the same exact A matrix for comparison with bivariate and latent variable model
   
   # Ring number standardized
   mutate(ringnr = as.character(trimws(gsub("_.*$", "", ringnr)))) %>%
@@ -136,8 +137,7 @@ valid_phenotyped_ids <- intersect(trait_subset_temp$ringnr, pedigree_prepped$rin
 # Create the final data object using only these valid IDs
 trait_subset <- trait_subset_temp %>%
   filter(ringnr %in% valid_phenotyped_ids) 
-# %>%
-#   arrange(ringnr) 
+
 
 
 
@@ -237,7 +237,7 @@ nt <- 1    # Thinning
 
 out_1 <- stan(file = 'animal_model_univariate.stan',
               data = dataset,
-              pars = tomonitor,
+              # pars = tomonitor,  # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
               chains = nc, iter = ni, warmup = nw, thin = nt,
               open_progress = FALSE,
               seed = 123) 

@@ -115,7 +115,7 @@ smaller_ped_prepped <- prepPed(smaller_pedigree, gender = NULL, check = TRUE)
 A_small_nadiv <- makeA(smaller_ped_prepped)
 
 # Subset A to valid phenotyped individuals
-A_bivariate <- A_small_nadiv[valid_ids, valid_ids]
+A_hestmannoy <- A_small_nadiv[valid_ids, valid_ids]
 
 
 cat("Data and Matrix: No =", nrow(trait_subset), "Na =", length(valid_ids), "\n")
@@ -125,7 +125,7 @@ cat("Data and Matrix: No =", nrow(trait_subset), "Na =", length(valid_ids), "\n"
 
 # Map animals to integers
 
-matrix_ids <- rownames(A_bivariate)
+matrix_ids <- rownames(A_hestmannoy)
 animal_map <- setNames(seq_len(length(matrix_ids)), matrix_ids)
 animal_idx <- animal_map[trait_subset$ringnr]
 
@@ -143,7 +143,7 @@ dataset_bivariate <- list(
   K = K,          
   animal = animal_idx,
   Na = length(valid_ids),
-  A = as.matrix(A_bivariate)
+  A = as.matrix(A_hestmannoy)
 )
 
 
@@ -165,15 +165,15 @@ tomonitor <- c('beta', 'Sigma_A', 'Sigma_E', 'Sigma_R',
 
 out_bivariate <- stan(file = 'Bivariate_Animal_Model.stan',
                       data = dataset_bivariate, 
-                      #pars = tomonitor,
+                      #pars = tomonitor, # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
                       chains = nc, iter = ni, warmup = nw, thin = nt,
                       open_progress = FALSE,
                       seed = 123)
 
 # Save outputs
-saveRDS(out_bivariate, 'Output_Bivariate_Animal_Model.rds')
+saveRDS(out_bivariate, 'Output_Bivariate_Animal_Model_Correct_Sorting.rds')
 
 summ_biv <- summary(out_bivariate)$summary
-write.csv(as.data.frame(summ_biv), file = "Output_Bivariate_Summary.csv", row.names = TRUE)
+write.csv(as.data.frame(summ_biv), file = "Output_Bivariate_Summary_Correct_Sorting.csv", row.names = TRUE)
 
 cat("Bivariate analysis complete. Summary saved.\n")
