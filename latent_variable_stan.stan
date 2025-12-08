@@ -79,6 +79,7 @@ model {
   lambda1 ~ lognormal(0, 1);
   lambda_free ~ normal(0, 1);
   sd_R ~ exponential(1);
+  // sd_R ~ normal(0, 5)
   
   // h2_psi has an implicit uniform(0,1) prior
 

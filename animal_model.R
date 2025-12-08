@@ -200,7 +200,9 @@ animal_map <- setNames(seq_len(length(matrix_ids)), matrix_ids)
 animal_idx <- animal_map[trait_subset$ringnr]
 
 # Prepare Y (response)
-Y <- as.numeric(trait_subset$ving_h) 
+# Y <- as.numeric(trait_subset$ving_h) 
+Y <- as.numeric(trait_subset$nebb_l) 
+
 
 # Prepare fixed effects matrix (X) with an intercept column (all 1's) and a sex column (0/1)
 X_mat <- model.matrix(~ sex, data = trait_subset)
@@ -243,12 +245,12 @@ out_1 <- stan(file = 'animal_model_univariate.stan',
               seed = 123) 
 
 
-saveRDS(out_1, file = "Output_Univariate_Animal_Model_Correct_Sorting.rds")
+saveRDS(out_1, file = "Output_Univariate_Animal_Model_Correct_Sorting_beak.rds")
 summ_uni <- summary(out_1)$summary
-write.csv(as.data.frame(summ_uni), "Output_Univariate_Summary_Correct_Sorting.csv", row.names = TRUE)
+write.csv(as.data.frame(summ_uni), "Output_Univariate_Summary_Correct_Sorting_beak.csv", row.names = TRUE)
 
 
-cat("Summary written to: Output_Univariate_Summary_Correct_Sorting.csv\n")
+cat("Summary written to: Output_Univariate_Summary_Correct_Sorting_beak.csv\n")
 
 
 
