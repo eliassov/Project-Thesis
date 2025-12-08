@@ -237,7 +237,7 @@ nt <- 1    # Thinning
 
 out_1 <- stan(file = 'animal_model_univariate.stan',
               data = dataset,
-              # pars = tomonitor,  # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
+              pars = tomonitor,  # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
               chains = nc, iter = ni, warmup = nw, thin = nt,
               open_progress = FALSE,
               seed = 123) 

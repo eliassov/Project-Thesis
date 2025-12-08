@@ -28,15 +28,9 @@ parameters {
 }
 
 transformed parameters {
-    real<lower = 0> var_A;
-    real<lower = 0> var_E;
-    real<lower = 0> var_R;
+
     vector[Na] alpha;
     vector[Na] gamma;
-
-    var_A = square(sd_A);
-    var_E = square(sd_E);
-    var_R = square(sd_R);
 
     alpha = sd_A * (LA * alpha_std);
     gamma = sd_E * gamma_std;
@@ -49,9 +43,10 @@ model {
     // Using a generic normal prior for both coefficients
     beta ~ normal(0, 100); 
 
-    sd_A ~ exponential(7); 
-    sd_E ~ exponential(7);
-    sd_R ~ exponential(7);
+    // Half normal weak priors on the standard deviations
+    sd_A ~ normal(0, 10); 
+    sd_E ~ normal(0, 10);
+    sd_R ~ normal(0, 10);
 
     alpha_std ~ normal(0, 1);
     gamma_std ~ normal(0, 1);
@@ -65,9 +60,15 @@ model {
 }
 
 generated quantities {
+    real<lower=0> var_A;
+    real<lower=0> var_E;
+    real<lower=0> var_R;
     real<lower=0> var_P;
     real<lower=0> heritability;
-
+    
+    var_A = square(sd_A);
+    var_E = square(sd_E);
+    var_R = square(sd_R); 
     var_P = var_A + var_E + var_R;
     heritability = var_A / var_P;
 }
