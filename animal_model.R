@@ -107,8 +107,8 @@ tryCatch({
 trait_subset_temp <- traitData %>%
   # Island and traits
   filter(sted_r == "hestmannøy", 
-         !is.na(ving_h)) %>%
-         !is.na(nebb_l) %>% # Added this filter so that it is the same exact A matrix for comparison with bivariate and latent variable model
+      !is.na(ving_h),         
+      !is.na(nebb_l)) %>%  # Added this filter so that it is the same exact A matrix for comparison with bivariate and latent variable model
   
   # Ring number standardized
   mutate(ringnr = as.character(trimws(gsub("_.*$", "", ringnr)))) %>%
