@@ -213,14 +213,14 @@ tomonitor_lv <- c(
 
 out_lv <- stan(file = 'latent_variable_stan.stan',
                data = dataset_lv,
-               #pars = tomonitor_lv,  # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
+               pars = tomonitor_lv,  # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
                chains = nc, iter = ni, warmup = nw, thin = nt,
                open_progress = FALSE,
                seed = 123)
 
-saveRDS(out_lv, 'Output_LV_Animal_Model_Correct_Sorting.rds')
+saveRDS(out_lv, 'Output_LV_Final_Relevant.rds')
 summ_lv <- summary(out_lv)$summary
-write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary_Correct_Sorting.csv", row.names = TRUE)
+write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary_Final_Relevant.csv", row.names = TRUE)
 
 
 # BACK TRANSFORMATION 
@@ -301,5 +301,5 @@ posterior_summary$Upper_95 <- c(
   quantile(samples$h2_psi, 0.975)
 )
 
-write.csv(posterior_summary, "Output_LV_Final_Results_Correct_Sorting.csv", row.names = TRUE)
+write.csv(posterior_summary, "Output_LV_Final_Results_Final_Relevant.csv", row.names = TRUE)
 print(posterior_summary)

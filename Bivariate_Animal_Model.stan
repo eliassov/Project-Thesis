@@ -62,11 +62,11 @@ model {
   to_vector(beta) ~ normal(0, 100); // Weakly informative prior for all betas
   
   L_A ~ lkj_corr_cholesky(1);
-  sd_A ~ exponential(7);
+  sd_A ~ normal(0, 10);
   L_E ~ lkj_corr_cholesky(1);
-  sd_E ~ exponential(7);
+  sd_E ~ normal(0, 10);
   L_R ~ lkj_corr_cholesky(1);
-  sd_R ~ exponential(7);
+  sd_R ~ normal(0, 10);
   to_vector(alpha_std) ~ normal(0, 1);
   to_vector(gamma_std) ~ normal(0, 1);
 

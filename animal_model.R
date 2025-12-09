@@ -223,7 +223,7 @@ dataset <- list(
 
 
 
-tomonitor <- c('beta', 'var_A', 'var_E', 'var_R', 'var_P', 'heritability')
+tomonitor <- c('beta', 'var_A', 'var_E', 'var_R', 'var_P', 'heritability', 'sd_A', 'sd_E', 'sd_R', 'sd_P')
 
 rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())

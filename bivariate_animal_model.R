@@ -161,19 +161,19 @@ nt <- 1
 # Parameters to monitor 
 tomonitor <- c('beta', 'Sigma_A', 'Sigma_E', 'Sigma_R', 
                'heritability1', 'heritability2', 
-               'cor_A', 'cor_E', 'cor_R')
+               'cor_A', 'cor_E', 'cor_R', 'sd_A', 'sd_E', 'sd_R')
 
 out_bivariate <- stan(file = 'Bivariate_Animal_Model.stan',
                       data = dataset_bivariate, 
-                      #pars = tomonitor, # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
+                      pars = tomonitor, # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
                       chains = nc, iter = ni, warmup = nw, thin = nt,
                       open_progress = FALSE,
                       seed = 123)
 
 # Save outputs
-saveRDS(out_bivariate, 'Output_Bivariate_Animal_Model_Correct_Sorting.rds')
+saveRDS(out_bivariate, 'Output_Bivariate_Final_Relevant.rds')
 
 summ_biv <- summary(out_bivariate)$summary
-write.csv(as.data.frame(summ_biv), file = "Output_Bivariate_Summary_Correct_Sorting.csv", row.names = TRUE)
+write.csv(as.data.frame(summ_biv), file = "Output_Bivariate_Summary_Final_Relevant.csv", row.names = TRUE)
 
 cat("Bivariate analysis complete. Summary saved.\n")
