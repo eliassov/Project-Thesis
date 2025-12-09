@@ -154,8 +154,8 @@ options(mc.cores = parallel::detectCores())
 
 # MCMC settings
 nc <- 4
-nw <- 3000
-ni <- 6000
+nw <- 5000
+ni <- 10000
 nt <- 1
 
 # Parameters to monitor 
