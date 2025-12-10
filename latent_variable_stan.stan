@@ -78,8 +78,7 @@ model {
   to_vector(beta) ~ normal(0, 1);
   lambda1 ~ lognormal(0, 1);
   lambda_free ~ normal(0, 1);
-  sd_R ~ exponential(1);
-  // sd_R ~ normal(0, 5)
+  sd_R ~ normal(0, 10);
   
   // h2_psi has an implicit uniform(0,1) prior
 
@@ -96,6 +95,7 @@ model {
 generated quantities {
   real var_psi_a = h2_psi;
   real var_psi_e = 1 - h2_psi;
+  vector[Nt] var_R = square(sd_R);
   
   real sd_psi_a = sqrt(var_psi_a);
   real sd_psi_e = sqrt(var_psi_e);

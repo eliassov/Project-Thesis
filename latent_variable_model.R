@@ -208,7 +208,7 @@ nt <- 1
 
 tomonitor_lv <- c(
   "beta", "lambda", "sd_psi_a", "sd_psi_e", "sd_R", 
-  "var_psi_a", "var_psi_e", "h2_psi", "h2_traits"
+  "var_psi_a", "var_psi_e", "var_R", "h2_psi", "h2_traits"
 )
 
 out_lv <- stan(file = 'latent_variable_stan.stan',
@@ -247,6 +247,10 @@ loading_beak <- samples$lambda[,2]
 # h2_psi approach puts variance into lambda scaling
 VA_wing   <- samples$lambda[,1]^2 * samples$var_psi_a * sd_wing^2
 VA_beak   <- samples$lambda[,2]^2 * samples$var_psi_a * sd_beak^2
+
+VE_wing   <- samples$lambda[,1]^2 * samples$var_psi_e * sd_wing^2
+VE_beak   <- samples$lambda[,2]^2 * samples$var_psi_e * sd_beak^2
+
 VR_wing   <- samples$sd_R[,1]^2 * sd_wing^2
 VR_beak   <- samples$sd_R[,2]^2 * sd_beak^2
 
