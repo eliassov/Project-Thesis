@@ -27,6 +27,7 @@ parameters {
   
   // Residual SDs for traits
   vector<lower=0>[Nt] sd_R; 
+  // What needs to change here for the residual to be in the lv? 
 
   // We estimate h2 directly. This constrains total var(psi) = 1
   real<lower=0, upper=1> h2_psi; 
@@ -34,6 +35,7 @@ parameters {
   // Standardized random effects
   vector[Na] psi_a_std; 
   vector[Na] psi_e_std; 
+
 }
 
 transformed parameters {
@@ -41,6 +43,7 @@ transformed parameters {
   vector[Na] psi_a;
   vector[Na] psi_e;
   vector[Na] psi;
+
   matrix[No, Nt] eta;
   matrix[No, Nt] fixed_part;
 
@@ -53,18 +56,16 @@ transformed parameters {
   // Environmental part scales with sqrt(1-h2)
   psi_a = sqrt(h2_psi) * (LA * psi_a_std); 
   psi_e = sqrt(1 - h2_psi) * psi_e_std; 
-  
+
   // Total psi has variance = h2 + (1-h2) = 1
   psi = psi_a + psi_e;
+
+
 
   // Compute expected values
   fixed_part = X * beta;
 
-  // for (o in 1:No) {
-  //   for (t in 1:Nt) {
-  //     eta[o,t] = fixed_part[o,t] + lambda[t] * psi[animal[o]];
-  //   }
-  // }
+  
   
   
   // psi[animal] is a vector of length No
@@ -85,9 +86,7 @@ model {
   psi_a_std ~ normal(0, 1);
   psi_e_std ~ normal(0, 1);
   
-  // for (o in 1:No) {
-  //   Y[o] ~ normal(eta[o], sd_R);
-  // }
+
   
   to_vector(Y) ~ normal(to_vector(eta), to_vector(rep_matrix(sd_R', No)));
 }
@@ -101,8 +100,7 @@ generated quantities {
   real sd_psi_e = sqrt(var_psi_e);
 
   vector[Nt] h2_traits; 
-  // vector[Nt] h2_traits_no_residual; # Is just the heritability of LV
-  
+
   for (t in 1:Nt) {
     // V_A(trait) = lambda^2 * V_A(psi)
     // V_P(trait) = lambda^2 * V_P(psi) + V_R(trait)
@@ -111,10 +109,6 @@ generated quantities {
     real vp_trait = square(lambda[t]) * 1.0 + square(sd_R[t]);
     
     h2_traits[t] = va_trait / vp_trait;
-    
-    // Heritability ignoring residual (ratio of individual variance that is genetic) 
-    // (but this is just the heritability for the LV regardless of the trait)
-    // h2_traits_no_residual[t] = va_trait / square(lambda[t]);
   }
 }
 

@@ -2,6 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
-plots_univariate.R
-plots_bivariate.R
-plots_and_tables_LV.R
+lv_corr_resid.stan
+
+

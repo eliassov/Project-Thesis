@@ -207,103 +207,209 @@ ni <- 10000
 nt <- 1
 
 tomonitor_lv <- c(
-  "beta", "lambda", "sd_psi_a", "sd_psi_e", "sd_R", 
-  "var_psi_a", "var_psi_e", "var_R", "h2_psi", "h2_traits"
+  "beta",             # Fixed effects (intercepts and sex)
+  "lambda",           # Factor loadings for traits
+  "var_LV_genetic",   # Proportion of LV variance that is genetic (h2_psi)
+  "var_LV_perm_env",  # Proportion of LV variance that is permanent environmental
+  "R_mat",            # The full 2x2 residual covariance matrix
+  "h2_traits",        # Reconstructed heritabilities for traits
+  "psi_ind"           # Individual latent scores (for caterpillar plots)
 )
 
-out_lv <- stan(file = 'latent_variable_stan.stan',
+out_lv <- stan(file = 'lv_corr_resid.stan',
                data = dataset_lv,
                pars = tomonitor_lv,  # Optional, but it doesn't take too much longer to monitor all parameters, and then you get breeding values and environmental random effects
                chains = nc, iter = ni, warmup = nw, thin = nt,
                open_progress = FALSE,
                seed = 123)
 
-saveRDS(out_lv, 'Output_LV_Final_Relevant.rds')
+saveRDS(out_lv, 'Output_LV_corr_resid.rds')
 summ_lv <- summary(out_lv)$summary
-write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary_Final_Relevant.csv", row.names = TRUE)
+write.csv(as.data.frame(summ_lv), file = "Output_LV_Summary_corr_resid.csv", row.names = TRUE)
+
+
 
 
 # BACK TRANSFORMATION 
 samples <- rstan::extract(out_lv)
 
-# Fixed effects (means):
-# beta[sample, predictor, trait]
-# predictor 1 = Intercept (female mean)
-# predictor 2 = Sexm (male effect)
-
-# Trait 1: wing length
+# --- 1. Fixed Effects (Means) ---
 mu_female_wing <- samples$beta[,,1][,1] * sd_wing + mean_wing
-eff_male_wing  <- samples$beta[,,1][,2] * sd_wing # Differences scale with SD only
-
-# Trait 2: beak length
+eff_male_wing  <- samples$beta[,,1][,2] * sd_wing 
 mu_female_beak <- samples$beta[,,2][,1] * sd_beak + mean_beak
 eff_male_beak  <- samples$beta[,,2][,2] * sd_beak
 
-# Loadings
+# --- 2. Loadings ---
 loading_wing <- samples$lambda[,1]
 loading_beak <- samples$lambda[,2]
 
-# Variance components (unscaled)
-# h2_psi approach puts variance into lambda scaling
-VA_wing   <- samples$lambda[,1]^2 * samples$var_psi_a * sd_wing^2
-VA_beak   <- samples$lambda[,2]^2 * samples$var_psi_a * sd_beak^2
+# --- 3. Variance Components (Scaled back to mm^2) ---
 
-VE_wing   <- samples$lambda[,1]^2 * samples$var_psi_e * sd_wing^2
-VE_beak   <- samples$lambda[,2]^2 * samples$var_psi_e * sd_beak^2
+# A. Additive Genetic Variance (via Latent Variable)
+VA_wing <- samples$lambda[,1]^2 * samples$var_LV_genetic * sd_wing^2
+VA_beak <- samples$lambda[,2]^2 * samples$var_LV_genetic * sd_beak^2
 
-VR_wing   <- samples$sd_R[,1]^2 * sd_wing^2
-VR_beak   <- samples$sd_R[,2]^2 * sd_beak^2
+# B. Permanent Environmental Variance (via Latent Variable)
+V_PE_wing <- samples$lambda[,1]^2 * samples$var_LV_perm_env * sd_wing^2
+V_PE_beak <- samples$lambda[,2]^2 * samples$var_LV_perm_env * sd_beak^2
 
-# Compile
-posterior_summary <- data.frame(
-  Parameter = c(
-    "Female_Mean_Wing", "Male_Effect_Wing",
-    "Female_Mean_Beak", "Male_Effect_Beak",
-    "Loading_Wing", "Loading_Beak",
-    "VA_Wing", "VA_Beak",
-    "VR_Wing", "VR_Beak",
-    "h2_Wing", "h2_Beak",
-    "h2_Latent_Size"
-  ),
-  Mean = c(
-    mean(mu_female_wing), mean(eff_male_wing),
-    mean(mu_female_beak), mean(eff_male_beak),
-    mean(loading_wing), mean(loading_beak),
-    mean(VA_wing), mean(VA_beak),
-    mean(VR_wing), mean(VR_beak),
-    mean(samples$h2_traits[,1]), mean(samples$h2_traits[,2]),
-    mean(samples$h2_psi)
-  ),
-  SD = c(
-    sd(mu_female_wing), sd(eff_male_wing),
-    sd(mu_female_beak), sd(eff_male_beak),
-    sd(loading_wing), sd(loading_beak),
-    sd(VA_wing), sd(VA_beak),
-    sd(VR_wing), sd(VR_beak),
-    sd(samples$h2_traits[,1]), sd(samples$h2_traits[,2]),
-    sd(samples$h2_psi)
-  )
+# C. Residual Variance (from R_mat)
+# R_mat contains the total temporary environmental variance (shared + unique)
+V_R_wing <- samples$R_mat[, 1, 1] * sd_wing^2
+V_R_beak <- samples$R_mat[, 2, 2] * sd_beak^2
+
+# D. Total Phenotypic Variance
+VP_wing <- VA_wing + V_PE_wing + V_R_wing
+VP_beak <- VA_beak + V_PE_beak + V_R_beak
+
+# --- 4. Ratios and Correlations ---
+# Trait-specific ratios
+h2_wing_calc  <- VA_wing / VP_wing
+h2_beak_calc  <- VA_beak / VP_beak
+pe2_wing_calc <- V_PE_wing / VP_wing
+pe2_beak_calc <- V_PE_beak / VP_beak
+
+# Residual Correlation (Environmental correlation not captured by the LV)
+res_corr <- samples$R_mat[, 1, 2] / sqrt(samples$R_mat[, 1, 1] * samples$R_mat[, 2, 2])
+
+# --- 5. Compile Results ---
+get_summary <- function(param_vector) {
+  c(mean = mean(param_vector, na.rm = TRUE), 
+    sd = sd(param_vector, na.rm = TRUE), 
+    L95 = quantile(param_vector, 0.025, na.rm = TRUE), 
+    U95 = quantile(param_vector, 0.975, na.rm = TRUE))
+}
+
+params_list <- list(
+  Female_Mean_Wing = mu_female_wing,
+  Male_Effect_Wing = eff_male_wing,
+  Female_Mean_Beak = mu_female_beak,
+  Male_Effect_Beak = eff_male_beak,
+  
+  Loading_Wing = loading_wing,
+  Loading_Beak = loading_beak,
+  
+  LV_Prop_Genetic = samples$var_LV_genetic,
+  LV_Prop_PermEnv = samples$var_LV_perm_env,
+  Residual_Correlation = res_corr,
+  
+  VA_Wing   = VA_wing,
+  V_PE_Wing = V_PE_wing,
+  V_R_Wing  = V_R_wing,
+  VP_Wing   = VP_wing,
+  
+  VA_Beak   = VA_beak,
+  V_PE_Beak = V_PE_beak,
+  V_R_Beak  = V_R_beak,
+  VP_Beak   = VP_beak,
+  
+  h2_Wing = h2_wing_calc,
+  h2_Beak = h2_beak_calc,
+  pe2_Wing = pe2_wing_calc,
+  pe2_Beak = pe2_beak_calc
 )
 
-# Add credible intervals
-posterior_summary$Lower_95 <- c(
-  quantile(mu_female_wing, 0.025), quantile(eff_male_wing, 0.025),
-  quantile(mu_female_beak, 0.025), quantile(eff_male_beak, 0.025),
-  quantile(loading_wing, 0.025), quantile(loading_beak, 0.025),
-  quantile(VA_wing, 0.025), quantile(VA_beak, 0.025),
-  quantile(VR_wing, 0.025), quantile(VR_beak, 0.025),
-  quantile(samples$h2_traits[,1], 0.025), quantile(samples$h2_traits[,2], 0.025),
-  quantile(samples$h2_psi, 0.025)
-)
-posterior_summary$Upper_95 <- c(
-  quantile(mu_female_wing, 0.975), quantile(eff_male_wing, 0.975),
-  quantile(mu_female_beak, 0.975), quantile(eff_male_beak, 0.975),
-  quantile(loading_wing, 0.975), quantile(loading_beak, 0.975),
-  quantile(VA_wing, 0.975), quantile(VA_beak, 0.975),
-  quantile(VR_wing, 0.975), quantile(VR_beak, 0.975),
-  quantile(samples$h2_traits[,1], 0.975), quantile(samples$h2_traits[,2], 0.975),
-  quantile(samples$h2_psi, 0.975)
-)
-
-write.csv(posterior_summary, "Output_LV_Final_Results_Final_Relevant.csv", row.names = TRUE)
+posterior_summary <- do.call(rbind, lapply(params_list, get_summary))
+posterior_summary <- as.data.frame(posterior_summary)
+write.csv(posterior_summary, "Output_LV_Final_Results_corr_resid.csv", row.names = TRUE)
 print(posterior_summary)
+
+
+
+
+# # BACK TRANSFORMATION 
+# samples <- rstan::extract(out_lv)
+# 
+# # Fixed effects (means):
+# # beta[sample, predictor, trait]
+# # predictor 1 = Intercept (female mean)
+# # predictor 2 = Sexm (male effect)
+# 
+# # Trait 1: wing length
+# mu_female_wing <- samples$beta[,,1][,1] * sd_wing + mean_wing
+# eff_male_wing  <- samples$beta[,,1][,2] * sd_wing # Differences scale with SD only
+# 
+# # Trait 2: beak length
+# mu_female_beak <- samples$beta[,,2][,1] * sd_beak + mean_beak
+# eff_male_beak  <- samples$beta[,,2][,2] * sd_beak
+# 
+# # Loadings
+# loading_wing <- samples$lambda[,1]
+# loading_beak <- samples$lambda[,2]
+# 
+# # Variance components (unscaled)
+# # h2_psi approach puts variance into lambda scaling
+# VA_wing   <- samples$lambda[,1]^2 * samples$var_LV_genetic * sd_wing^2
+# VA_beak   <- samples$lambda[,2]^2 * samples$var_LV_genetic * sd_beak^2
+# 
+# V_PE_wing   <- samples$lambda[,1]^2 * samples$var_LV_perm_env * sd_wing^2
+# V_PE_beak   <- samples$lambda[,2]^2 * samples$var_LV_perm_env * sd_beak^2
+# 
+# V_TE_wing <- samples$lambda[,1]^2 * samples$var_LV_temp_env * sd_wing^2
+# V_TE_beak <- samples$lambda[,2]^2 * samples$var_LV_temp_env * sd_beak^2
+# 
+# V_R_wing   <- samples$var_R[,1] * sd_wing^2
+# V_R_beak   <- samples$var_R[,2] * sd_beak^2
+# 
+# # E. Total Phenotypic Variance (Reconstructed)
+# VP_wing <- VA_wing + V_PE_wing + V_TE_wing + V_R_wing
+# VP_beak <- VA_beak + V_PE_beak + V_TE_beak + V_R_beak
+# 
+# # --- 4. Ratios (Heritability & PE Ratio) ---
+# # We calculate these using the reconstructed totals to be safe
+# h2_wing_calc <- VA_wing / VP_wing
+# h2_beak_calc <- VA_beak / VP_beak
+# 
+# pe2_wing_calc <- V_PE_wing / VP_wing
+# pe2_beak_calc <- V_PE_beak / VP_beak
+# 
+# # --- 5. Compile Results ---
+# # Define a helper function for summary stats to keep code clean
+# get_summary <- function(param_vector) {
+#   c(mean = mean(param_vector), 
+#     sd = sd(param_vector), 
+#     L95 = quantile(param_vector, 0.025), 
+#     U95 = quantile(param_vector, 0.975))
+# }
+# 
+# # Create list of all parameters we want to summarize
+# params_list <- list(
+#   # Fixed Effects
+#   Female_Mean_Wing = mu_female_wing,
+#   Male_Effect_Wing = eff_male_wing,
+#   Female_Mean_Beak = mu_female_beak,
+#   Male_Effect_Beak = eff_male_beak,
+#   
+#   # Latent Variable Structure
+#   Loading_Wing = loading_wing,
+#   Loading_Beak = loading_beak,
+#   LV_Prop_Genetic = samples$var_LV_genetic,
+#   LV_Prop_PermEnv = samples$var_LV_perm_env,
+#   LV_Prop_TempEnv = samples$var_LV_temp_env,
+#   
+#   # Variance Components (Wing)
+#   VA_Wing   = VA_wing,
+#   V_PE_Wing = V_PE_wing,
+#   V_TE_Wing = V_TE_wing, # Shared residual
+#   V_R_Wing  = V_R_wing,  # Unique residual
+#   VP_Wing   = VP_wing,   # Total
+#   
+#   # Variance Components (Beak)
+#   VA_Beak   = VA_beak,
+#   V_PE_Beak = V_PE_beak,
+#   V_TE_Beak = V_TE_beak,
+#   V_R_Beak  = V_R_beak,
+#   VP_Beak   = VP_beak,
+#   
+#   # Ratios
+#   h2_Wing = h2_wing_calc,
+#   h2_Beak = h2_beak_calc,
+#   pe2_Wing = pe2_wing_calc,
+#   pe2_Beak = pe2_beak_calc
+# )
+# 
+# # Apply summary function and bind into dataframe
+# posterior_summary <- do.call(rbind, lapply(params_list, get_summary))
+# posterior_summary <- as.data.frame(posterior_summary)
+# write.csv(posterior_summary, "Output_LV_Final_Results_corr_resid_.csv", row.names = TRUE)
+# print(posterior_summary)
