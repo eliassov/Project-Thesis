@@ -58,7 +58,10 @@ parameters {
   matrix[Nt, Nlv] lambda_raw;
   
   real<lower=0> lambda_1_1;
+  vector[Nt-1] lambda_free_1;
   real<lower=0> lambda_2_2;
+  vector[Nt-1] lambda_free_2;
+
 
   // Latent Effects
   matrix[Nlv, Na] w_a;  
@@ -97,22 +100,34 @@ transformed parameters {
     LV[, k] = sqrt(h2_lv[k]) * G_effect[, k] + sqrt(1 - h2_lv[k]) * w_pe[k, ]';
   }
 
-  matrix[Nt, Nlv] lambda_con;
-  lambda_con = lambda_raw;
-  lambda_con[1,1] = lambda_1_1;
-  lambda_con[2,2] = lambda_2_2;
+
+  matrix[Nt, Nlv] Lambda = rep_matrix(0.0, Nt, Nlv);
   
-  // 3. Shrinkage
-  matrix[Nt, Nlv] Lambda;
-  Lambda[, 1] = lambda_con[, 1];            
-  Lambda[, 2] = lambda_con[, 2] * sqrt(rho);
+  Lambda[1,1] = lambda_1_1;
+  
+  for (t in 2:Nt) {
+    Lambda[t, 1] = lambda_free_1[t-1];
+  }
+  
+  Lambda[2,2] = lambda_2_2;
+  Lambda[1,2] = lambda_free_2[1];
+  
+  for (t in 3:Nt) {
+    Lambda[t, 2] = lambda_free_2[t-2];
+  }
+
 }
 
 model {
   // Priors
-  rho ~ beta(1, 2);
+  // rho ~ beta(1, 2);
   h2_lv ~ beta(2.5, 2.5); 
-  to_vector(lambda_raw) ~ std_normal();
+  lambda_1_1 ~ normal(0, 1.0);
+  lambda_free_1 ~ normal(0, 1.0);
+  
+  lambda_2_2 ~ normal(0, 0.2);
+  lambda_free_2 ~ normal(0, 0.2);
+
   sd_R ~ normal(0, 1);
   
   to_vector(beta_morph) ~ normal(0,1);
@@ -169,4 +184,17 @@ model {
 
 }
 
+
+generated quantities {
+  real rho;
+  real var_lv1 = 0;
+  real var_lv2 = 0; 
+  
+  for (t in 1:Nt) {
+    var_lv1 += square(Lambda[t,1]);
+    var_lv2 += square(Lambda[t,2]);
+  }
+  
+  rho = var_lv2 / var_lv1;
+}
 

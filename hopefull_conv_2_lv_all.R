@@ -330,32 +330,79 @@ rstan_options(auto_write = TRUE)
 options(mc.cores = parallel::detectCores())
 
 
+# init_fn_joint <- function() {
+#   
+#   # 1. Create and modify the loading matrix OUTSIDE the list
+#   L_init <- matrix(rnorm(dataset_joint$Nt * dataset_joint$Nlv, 0, 0.05), 
+#                    nrow = dataset_joint$Nt, ncol = dataset_joint$Nlv)
+#   
+#   # Force the initialization to respect your intended rotation
+#   L_init[1, 2] <- 0.2  # Start the cross-loading practically at zero
+#   
+#   # 2. NOW construct and return the named list
+#   list(
+#     # Loadings 
+#     lambda_raw = L_init,
+#     
+#     # SCALARS (Removed as.array)
+#     lambda_1_1 = runif(1, 0.8, 1.2),
+#     lambda_2_2 = runif(1, 0.4, 0.8),
+#     rho = runif(1, 0.1, 0.3),        
+#     
+#     # VECTORS/ARRAYS (Keep as.array)
+#     h2_lv = as.array(runif(dataset_joint$Nlv, 0.4, 0.6)),      
+#     sd_R = as.array(runif(dataset_joint$Nt, 0.5, 1.0)), 
+#     
+#     # Fixed Effects
+#     beta_morph = matrix(rnorm(dataset_joint$K_morph * dataset_joint$Nt, 0, 0.1), 
+#                         nrow = dataset_joint$K_morph, ncol = dataset_joint$Nt),
+#     beta_repro = as.array(rnorm(dataset_joint$K_repro, 0, 0.1)),
+#     beta_surv  = as.array(rnorm(dataset_joint$K_surv, 0, 0.1)),
+#     
+#     # Selection Gradients
+#     gamma_repro = as.array(rnorm(dataset_joint$Nlv, 0, 0.1)),
+#     gamma_surv  = as.array(rnorm(dataset_joint$Nlv, 0, 0.1)),
+#     
+#     # Latent Genetic and Environmental Noise
+#     w_a = matrix(rnorm(dataset_joint$Nlv * dataset_joint$Na, 0, 0.1), 
+#                  nrow = dataset_joint$Nlv, ncol = dataset_joint$Na),
+#     w_pe = matrix(rnorm(dataset_joint$Nlv * dataset_joint$Na, 0, 0.1), 
+#                   nrow = dataset_joint$Nlv, ncol = dataset_joint$Na),
+#     
+#     # Random Effect Variances
+#     sd_year_morph = as.array(runif(dataset_joint$Nt, 0.05, 0.2)),
+#     sd_init_morph = as.array(runif(dataset_joint$Nt, 0.05, 0.2)),
+#     
+#     # SCALARS (Removed as.array)
+#     sd_year_repro = runif(1, 0.05, 0.2),
+#     sd_year_surv  = runif(1, 0.05, 0.2),
+#     
+#     # Random Effect Z-Scores
+#     z_year_morph = matrix(rnorm(dataset_joint$N_year * dataset_joint$Nt, 0, 0.1), 
+#                           nrow = dataset_joint$N_year, ncol = dataset_joint$Nt),
+#     z_year_repro = as.array(rnorm(dataset_joint$N_year, 0, 0.1)),
+#     z_year_surv  = as.array(rnorm(dataset_joint$N_year, 0, 0.1)),
+#     z_init_morph = matrix(rnorm(dataset_joint$N_init * dataset_joint$Nt, 0, 0.1), 
+#                           nrow = dataset_joint$N_init, ncol = dataset_joint$Nt)
+#   )
+# }
+
+# The above init function was for the run with no fixed effects, just init and year, and 2 lv with surv and repro added
+
 init_fn_joint <- function() {
   
-  # 1. Create and modify the loading matrix OUTSIDE the list
-  L_init <- matrix(rnorm(dataset_joint$Nt * dataset_joint$Nlv, 0, 0.05), 
-                   nrow = dataset_joint$Nt, ncol = dataset_joint$Nlv)
-  
-  # Force the initialization to respect your intended rotation
-  L_init[1, 2] <- 0.2  # Start the cross-loading practically at zero
-  
-  # 2. NOW construct and return the named list
   list(
-    # Loadings 
-    lambda_raw = L_init,
+    lambda_1_1 = runif(1, 0.5, 1.2),
+    lambda_free_1 = as.array(rnorm(dataset_joint$Nt - 1, 0, 0.1)),
+    lambda_2_2 = runif(1, 0.2, 0.6),
+    lambda_free_2 = as.array(rnorm(dataset_joint$Nt - 1, 0, 0.1)),
     
-    # SCALARS (Removed as.array)
-    lambda_1_1 = runif(1, 0.8, 1.2),
-    lambda_2_2 = runif(1, 0.4, 0.8),
-    rho = runif(1, 0.1, 0.3),        
+    h2_lv = as.array(runif(dataset_joint$Nlv, 0.4, 0.6)),
+    sd_R = as.array(runif(dataset_joint$Nt, 0.5, 1.0)),
     
-    # VECTORS/ARRAYS (Keep as.array)
-    h2_lv = as.array(runif(dataset_joint$Nlv, 0.4, 0.6)),      
-    sd_R = as.array(runif(dataset_joint$Nt, 0.5, 1.0)), 
-    
-    # Fixed Effects
     beta_morph = matrix(rnorm(dataset_joint$K_morph * dataset_joint$Nt, 0, 0.1), 
                         nrow = dataset_joint$K_morph, ncol = dataset_joint$Nt),
+    
     beta_repro = as.array(rnorm(dataset_joint$K_repro, 0, 0.1)),
     beta_surv  = as.array(rnorm(dataset_joint$K_surv, 0, 0.1)),
     
@@ -373,7 +420,7 @@ init_fn_joint <- function() {
     sd_year_morph = as.array(runif(dataset_joint$Nt, 0.05, 0.2)),
     sd_init_morph = as.array(runif(dataset_joint$Nt, 0.05, 0.2)),
     
-    # SCALARS (Removed as.array)
+    # SCALARS 
     sd_year_repro = runif(1, 0.05, 0.2),
     sd_year_surv  = runif(1, 0.05, 0.2),
     
@@ -386,6 +433,11 @@ init_fn_joint <- function() {
                           nrow = dataset_joint$N_init, ncol = dataset_joint$Nt)
   )
 }
+
+
+
+
+
 
 # Run the Joint Model
 out_joint <- stan(
