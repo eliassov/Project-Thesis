@@ -52,7 +52,7 @@ parameters {
 
   // Variances
   vector<lower=0>[Nt] sd_R; 
-  real<lower=0, upper=1> rho;
+  // real<lower=0, upper=1> rho;
   vector<lower=0, upper=1>[Nlv] h2_lv; 
   
   matrix[Nt, Nlv] lambda_raw;

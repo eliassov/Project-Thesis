@@ -444,19 +444,19 @@ out_joint <- stan(
   file = "hopefully_stan.stan",
   data = dataset_joint,
   init = init_fn_joint,        
-  chains = 6, 
+  chains = 4, 
   pars = c("beta_morph", "beta_repro", "beta_surv",
            "gamma_repro", "gamma_surv", "Lambda", "sd_R", 
            "sd_year_morph", "sd_year_repro", "sd_year_surv", "sd_init_morph", 
            "h2_lv"
            , "rho"
   ),
-  control = list(adapt_delta = 0.95), 
-  iter = 10000,          
-  warmup = 5500
+  control = list(adapt_delta = 0.93), 
+  iter = 5000,          
+  warmup = 2500
 )
 
-saveRDS(out_joint, 'Output_hopefully.rds')
+saveRDS(out_joint, 'Output_hopefully_no_rho.rds')
 
 
 
@@ -465,7 +465,7 @@ saveRDS(out_joint, 'Output_hopefully.rds')
 # ==============================================================================
 # 6. RESULTS & DIAGNOSTICS
 # ==============================================================================
-out_lv <- readRDS('Output_hopefully.rds')
+out_lv <- readRDS('Output_hopefully_no_rho.rds')
 
 # Print the parameters specific to the Joint Starter model
 print(out_lv,
