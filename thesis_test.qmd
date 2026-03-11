@@ -1,0 +1,1151 @@
+---
+title: "thesis_testing"
+author: "Elias Ovesen"
+format: html
+editor: visual
+---
+
+## Quarto
+
+Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+
+## Running Code
+
+When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+
+```{r}
+1 + 1
+```
+
+You can add options to executable code like this
+
+```{r}
+# ==============================================================================
+# 1. SETUP & LIBRARIES
+# ==============================================================================
+personal_lib <- "~/R/library"
+if (!dir.exists(personal_lib)) dir.create(personal_lib, recursive = TRUE)
+.libPaths(c(personal_lib, .libPaths()))
+
+required_packages <- c("rstan", "tidyverse", "nadiv", "MCMCglmm") 
+for (pkg in required_packages) {
+  if (!require(pkg, character.only = TRUE, quietly = TRUE)) {
+    install.packages(pkg, lib = personal_lib, repos = "https://cloud.r-project.org")
+    library(pkg, character.only = TRUE)
+  }
+}
+
+# ==============================================================================
+# 2. LOAD & CLEAN DATA (OPTIMIZED ORDER)
+# ==============================================================================
+
+# Pedigree
+pedData <- read.csv("pedigree_data.txt", sep = " ", header = TRUE, na.strings = "NA")
+pedigree_clean <- pedData %>%
+  dplyr::select(ringnr, dam, sire) %>%
+  mutate(across(c(ringnr, dam, sire), ~ as.character(trimws(gsub("_.*$", "", .)))),
+         dam = if_else(is.na(dam) | dam == "" | dam == "NA", NA_character_, dam),
+         sire = if_else(is.na(sire) | sire == "" | sire == "NA", NA_character_, sire))
+
+# External Parents
+all_parents <- unique(c(pedigree_clean$dam, pedigree_clean$sire))
+external_parents <- setdiff(all_parents, c(pedigree_clean$ringnr, NA_character_))
+if (length(external_parents) > 0) {
+  founder_df <- data.frame(ringnr = external_parents, dam = NA_character_, sire = NA_character_)
+  pedigree_full <- bind_rows(founder_df, pedigree_clean) %>% distinct(ringnr, .keep_all = TRUE)
+} else {
+  pedigree_full <- pedigree_clean
+}
+
+pedigree_prepped <- prepPed(pedigree_full, gender = NULL, check = TRUE)
+
+# Trait Data
+traitData <- read.csv("morphology.txt", sep = ";", header = TRUE, 
+                      na.strings = c("NA", ""), fileEncoding = "Windows-1252", 
+                      stringsAsFactors = FALSE, colClasses = c(ringnr = "character"))
+
+# A. LOAD & LIGHT FORMATTING (Crucial for matching)
+trait_raw <- traitData %>%
+  filter(sted_r == "hestmannøy", 
+         !is.na(ving_h), !is.na(nebb_l), !is.na(tars_h), !is.na(nebb_h), !is.na(vekt)) %>%
+  mutate(ringnr = as.character(trimws(gsub("_.*$", "", ringnr))))
+
+# B. ALIGN WITH PEDIGREE (The "Gatekeeper" Step)
+valid_ids <- intersect(trait_raw$ringnr, pedigree_prepped$ringnr)
+trait_subset_temp <- trait_raw %>% filter(ringnr %in% valid_ids)
+
+cat("Birds in Raw File:    ", nrow(trait_raw), "\n")
+cat("Birds with Pedigree:  ", nrow(trait_subset_temp), "\n")
+
+# C. DEEP CLEANING (Sex, Age, Bad IDs) on the SUBSET
+bad_ids <- c("8N27558", "8N42527", "8N13933", "8M71874", "8N87712", "8L89527")
+
+trait_subset_temp <- trait_subset_temp %>%
+  filter(!ringnr %in% bad_ids) %>%
+  mutate(raw_sex = if_else(!is.na(scriptsex) & scriptsex != "u", scriptsex, fieldsex)) %>%
+  mutate(sex = case_when(
+    raw_sex %in% c("m", "pm") ~ "m", 
+    raw_sex %in% c("f", "pf") ~ "f", 
+    TRUE ~ NA_character_
+  )) %>%
+  filter(!is.na(sex)) %>%
+  mutate(
+    s_age = trimws(as.character(scriptage)),
+    f_age = trimws(as.character(fieldage)),
+    age_class = case_when(
+      grepl("^1K", s_age) ~ "juvenile",
+      grepl("^[2-9]K", s_age) | grepl("^1[0-9]K", s_age) ~ "adult",
+      f_age %in% c("j", "pj") ~ "juvenile",
+      f_age %in% c("a", "pa") ~ "adult",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(age_class))
+
+# D. STATISTICAL OUTLIER REMOVAL (Residual Check)
+outlier_ids_to_kill <- c()
+traits_to_check <- c("ving_h", "tars_h", "nebb_l", "nebb_h", "vekt")
+
+for(t in traits_to_check) {
+  f <- as.formula(paste(t, "~ sex + age_class"))
+  fit <- lm(f, data = trait_subset_temp, na.action = na.exclude)
+  
+  resids <- rstudent(fit)
+  cutoff <- if(t == "vekt") 6.0 else 4.0 
+  
+  bad_rows <- which(abs(resids) > cutoff)
+  
+  if(length(bad_rows) > 0) {
+    new_bad_ids <- trait_subset_temp$ringnr[bad_rows]
+    outlier_ids_to_kill <- c(outlier_ids_to_kill, new_bad_ids)
+    cat("Trait:", t, "- Removing", length(new_bad_ids), "IDs\n")
+  }
+}
+
+# E. FINAL DATASET
+trait_subset_lv <- trait_subset_temp %>%
+  filter(!ringnr %in% unique(outlier_ids_to_kill))
+
+cat("Final Clean N: ", nrow(trait_subset_lv), "\n")
+
+
+
+# NEW: Log-transform FIRST, then scale
+trait_subset_lv <- trait_subset_lv %>%
+  mutate(
+    ving_h_std = as.numeric(scale(log(ving_h))),
+    nebb_l_std = as.numeric(scale(log(nebb_l))),
+    tars_h_std = as.numeric(scale(log(tars_h))),
+    nebb_h_std = as.numeric(scale(log(nebb_h))),
+    vekt_std   = as.numeric(scale(log(vekt)))
+  )
+
+
+cat("Data Loaded. N Rows:", nrow(trait_subset_lv), "\n")
+
+
+
+
+# 1. Convert to Date (R handles YYYY-MM-DD automatically)
+trait_subset_lv$date_obj <- as.Date(trait_subset_lv$dato)
+
+# 2. Extract month
+trait_subset_lv$month <- as.numeric(format(trait_subset_lv$date_obj, "%m"))
+
+
+
+# 1. Extract the Year as a factor
+trait_subset_lv <- trait_subset_lv %>%
+  mutate(
+    Year = factor(format(date_obj, "%Y")),
+    # Create the 3-level Season we discussed
+    Season_3 = factor(case_when(
+      month %in% c(5, 6, 7) ~ "Breeding",
+      month %in% c(8, 9)    ~ "Molt",
+      TRUE                  ~ "Winter"
+    ))
+  )
+
+
+
+
+
+
+# Grouping low-volume measurers using case_when
+trait_subset_lv <- trait_subset_lv %>%
+  group_by(init) %>%
+  mutate(init_clean = case_when(
+    n() < 10 ~ "OTHER",
+    TRUE     ~ as.character(init)
+  )) %>%
+  ungroup() %>%
+  mutate(init_clean = factor(init_clean))
+
+
+###############################################################
+
+############### DID I NOT ADD YEAR HERE?????? ##################
+
+##############################################################
+
+############# =============================================
+
+
+# ==============================================================================
+# 2.5 LOAD & CLEAN FITNESS DATA
+# ==============================================================================
+
+fitness_data <- read.csv("Fitness.csv", header = TRUE, stringsAsFactors = FALSE, na.strings = "NA", fileEncoding = "Windows-1252")
+
+fitness_data_clean <- fitness_data %>%
+  dplyr::select(Location, Year_ID, Year, Sex, Own_survival, N_Recruits, Least_age) %>%
+  filter(grepl("^Hestmann", Location)) %>%
+  mutate(
+    # Extract the ring number
+    ringnr = sub("^.*_", "", Year_ID),
+    
+    # NEW: Extract the actual calendar year and overwrite the 1-22 index
+    Year = sub("_.*$", "", Year_ID), 
+    
+    Own_survival = as.numeric(Own_survival)
+  ) %>%
+  # Gatekeeper: Must be in the prepared pedigree
+  filter(ringnr %in% pedigree_prepped$ringnr)
+
+# Split into two clean datasets (Stan cannot handle NA in the response variable)
+data_repro <- fitness_data_clean %>% drop_na(N_Recruits)
+data_surv  <- fitness_data_clean %>% drop_na(Own_survival)
+
+cat("Morphology records: ", nrow(trait_subset_lv), "\n")
+cat("Reproduction records: ", nrow(data_repro), "\n")
+cat("Survival records: ", nrow(data_surv), "\n")
+
+
+
+
+
+
+
+# ==============================================================================
+# 3. PEDIGREE PROCESSING
+# ==============================================================================
+pedigree_working <- pedigree_prepped
+colnames(pedigree_working) <- c("id", "dam", "sire") 
+pedigree_working$id   <- as.character(pedigree_working$id)
+pedigree_working$dam  <- as.character(pedigree_working$dam)
+pedigree_working$sire <- as.character(pedigree_working$sire)
+
+# NEW: Keep all birds that appear in ANY of the three datasets
+birds_to_keep <- unique(c(trait_subset_lv$ringnr, data_repro$ringnr, data_surv$ringnr))
+
+ped_pruned <- MCMCglmm::prunePed(pedigree_working, keep = birds_to_keep)
+
+A_inv_obj <- MCMCglmm::inverseA(ped_pruned, nodes = "ALL", scale = FALSE)
+ordered_ids <- rownames(A_inv_obj$Ainv)
+
+ped_ordered <- data.frame(
+  id = ordered_ids,
+  dam = as.character(A_inv_obj$pedigree[, 2]), 
+  sire = as.character(A_inv_obj$pedigree[, 3]),
+  stringsAsFactors = FALSE
+)
+
+dii_vector <- A_inv_obj$dii
+Na <- nrow(ped_ordered)
+
+dam_idx_mapped  <- match(ped_ordered$dam, ped_ordered$id)
+sire_idx_mapped <- match(ped_ordered$sire, ped_ordered$id)
+
+dam_idx_mapped[is.na(dam_idx_mapped)]   <- Na + 1
+sire_idx_mapped[is.na(sire_idx_mapped)] <- Na + 1
+
+id_map <- setNames(1:Na, ped_ordered$id)
+
+
+
+
+
+
+# ==============================================================================
+# 4. DATA MAPPING & UNIVERSAL FACTORS
+# ==============================================================================
+# 1. Map IDs
+animal_morph <- unname(id_map[trait_subset_lv$ringnr])
+animal_repro <- unname(id_map[data_repro$ringnr])
+animal_surv  <- unname(id_map[data_surv$ringnr])
+
+# 2. Universal Year Map (Crucial so Year 1 is the same everywhere)
+all_years <- sort(unique(c(as.character(trait_subset_lv$Year), 
+                           as.character(data_repro$Year), 
+                           as.character(data_surv$Year))))
+year_map <- setNames(1:length(all_years), all_years)
+
+year_morph <- unname(year_map[as.character(trait_subset_lv$Year)])
+year_repro <- unname(year_map[as.character(data_repro$Year)])
+year_surv  <- unname(year_map[as.character(data_surv$Year)])
+
+# 3. Measurer Map
+init_factor <- as.integer(factor(trait_subset_lv$init_clean))
+
+# 4. Trait Matrix
+Y_mat <- as.matrix(trait_subset_lv[, c("tars_h_std", "ving_h_std", "nebb_l_std", "nebb_h_std", "vekt_std")])
+
+
+
+
+# ==============================================================================
+# 5. STAN EXECUTION FOR JOINT MODEL
+# ==============================================================================
+dataset_joint <- list(
+  # Dimensions
+  No_morph = nrow(trait_subset_lv),
+  No_repro = nrow(data_repro),
+  No_surv  = nrow(data_surv),
+  Nt = 5, 
+  Nlv = 1,
+  Na = Na,
+  
+  # Responses
+  Y_morph = Y_mat,
+  Y_repro = as.array(as.integer(data_repro$N_Recruits)),
+  Y_surv  = as.array(as.integer(data_surv$Own_survival)),
+  
+  # Animal Indices
+  animal_morph = as.array(as.integer(animal_morph)),
+  animal_repro = as.array(as.integer(animal_repro)),
+  animal_surv  = as.array(as.integer(animal_surv)),
+  
+  # Pedigree
+  dam  = as.array(as.integer(dam_idx_mapped)), 
+  sire = as.array(as.integer(sire_idx_mapped)),
+  dii  = as.array(dii_vector),
+  
+  # Random Effects Indices
+  N_year = length(all_years),
+  year_morph = as.array(as.integer(year_morph)),
+  year_repro = as.array(as.integer(year_repro)),
+  year_surv  = as.array(as.integer(year_surv)),
+  
+  N_init = max(init_factor),
+  init_morph = as.array(as.integer(init_factor))
+)
+
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+
+init_fn_joint <- function() {
+  list(
+    # Core Morphology (Anchored for 1 LV)
+    lambda_anchor = array(runif(dataset_joint$Nlv, 0.5, 1.2)), 
+    lambda_free = matrix(rnorm((dataset_joint$Nt - 1) * dataset_joint$Nlv, 0, 0.1), 
+                         nrow = dataset_joint$Nt - 1, ncol = dataset_joint$Nlv),
+    rho = runif(1, 0.4, 0.6),        
+    h2_lv = array(runif(dataset_joint$Nlv, 0.4, 0.6)),      
+    sd_R = runif(dataset_joint$Nt, 0.5, 1.0), 
+    
+    # Intercepts & Slopes (Fitness gradients as arrays of length 1)
+    alpha_trait = rnorm(dataset_joint$Nt, 0, 0.5),
+    alpha_repro = rnorm(1, -0.5, 0.5),
+    alpha_surv  = rnorm(1, 0, 0.5),
+    gamma_repro = array(rnorm(dataset_joint$Nlv, 0, 0.1)),
+    gamma_surv  = array(rnorm(dataset_joint$Nlv, 0, 0.1)),
+    
+    # Genetic Noise (Now a 1 x Na matrix)
+    w_a = matrix(rnorm(dataset_joint$Nlv * dataset_joint$Na, 0, 0.1), 
+                 nrow = dataset_joint$Nlv),
+    w_pe = matrix(rnorm(dataset_joint$Nlv * dataset_joint$Na, 0, 0.1), 
+                  nrow = dataset_joint$Nlv),
+    
+    # Random Effects
+    sd_year_morph = runif(dataset_joint$Nt, 0.05, 0.2),
+    sd_year_repro = runif(1, 0.05, 0.2),
+    sd_year_surv  = runif(1, 0.05, 0.2),
+    sd_init_morph = runif(dataset_joint$Nt, 0.05, 0.2),
+    
+    z_year_morph = matrix(rnorm(dataset_joint$N_year * dataset_joint$Nt, 0, 0.1), 
+                          nrow = dataset_joint$N_year),
+    z_year_repro = rnorm(dataset_joint$N_year, 0, 0.1),
+    z_year_surv  = rnorm(dataset_joint$N_year, 0, 0.1),
+    z_init_morph = matrix(rnorm(dataset_joint$N_init * dataset_joint$Nt, 0, 0.1), 
+                          nrow = dataset_joint$N_init)
+  )
+}
+
+# When calling stan(), remember to use this updated init:
+# init = init_fn_joint_1lv
+
+
+
+
+# Run the Joint Model
+out_joint <- stan(
+  file = "combined_model_test.stan",
+  data = dataset_joint,
+  init = init_fn_joint,        
+  chains = 4, 
+  pars = c("alpha_trait", "alpha_repro", "alpha_surv", 
+           "gamma_repro", "gamma_surv", "Lambda", "sd_R", 
+           "sd_year_morph", "sd_year_repro", "sd_year_surv", "sd_init_morph", 
+           "h2_lv"
+           # , "rho"
+           ),
+  control = list(adapt_delta = 0.95), 
+  iter = 6000,          
+  warmup = 2000,
+  sample_file = "output_joint_chain"
+)
+
+saveRDS(out_joint, 'Output_Joint_Starter.rds')
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ==============================================================================
+# 6. RESULTS & DIAGNOSTICS
+# ==============================================================================
+out_lv <- readRDS('output_markov/Output_Joint_Starter.rds')
+
+# Print the parameters specific to the Joint Starter model
+print(out_lv,
+      pars = c("alpha_trait",       # Base intercepts for the 5 morph traits
+               "alpha_repro",       # Base intercept for reproduction
+               "alpha_surv",        # Base intercept for survival
+               "gamma_repro",       # Selection gradient: Size -> Reproduction!
+               "gamma_surv",        # Selection gradient: Size -> Survival!
+               "Lambda",            # Factor loadings (How traits build Size)
+               "h2_lv",             # Heritability of the Latent Size
+               # "rho",               # Shrinkage factor
+               "sd_R",              # Residual error for morph traits
+               "sd_year_morph",     # Year variance for morphology
+               "sd_year_repro",     # Year variance for reproduction
+               "sd_year_surv",      # Year variance for survival
+               "sd_init_morph",     # Measurer variance for morphology
+               "lp__"),             # Log-posterior (model fit)
+      probs = c(0.025, 0.975),
+      digits_summary = 3)
+
+
+
+
+
+library(bayesplot)
+library(ggplot2)
+
+# 1. Plot a stable parameter (The Grand Mean)
+color_scheme_set("mix-blue-red")
+p1 <- mcmc_trace(out_lv, pars = c("alpha_trait[1]", "sd_year_surv")) +
+  ggtitle("Stable Parameters (Rhat = 1.00)")
+
+# 2. Plot the 'Flipped' parameters
+p2 <- mcmc_trace(out_lv, pars = c("Lambda[1,1]", "gamma_repro[1]", "gamma_surv[1]")) +
+  ggtitle("Sign-Flipped Parameters (High Rhat)")
+
+p3 <- mcmc_trace(out_lv, pars = c("Lambda[1,2]", "Lambda[3,2]", "gamma_repro[2]", "gamma_surv[2]"))
+  
+
+# Show the plots
+print(p1)
+print(p2)
+print(p3)
+
+
+
+
+
+
+
+```
+
+A quick check here showed that there were quite a few birds that were phenotyped but that were not in the fitness data, so that we are missing about 30 percent of the measurements if we only select birds that are in all data sets. So, the solution here might be to keep all phenotyped birds, but only have fitness data for the ones that have that, and that is possible to do as far as I know. 
+
+
+```{stan}
+data {
+  // Dimensions
+  int<lower=1> No_morph; 
+  int<lower=1> No_repro;
+  int<lower=1> No_surv;
+  int<lower=1> Nt;  
+  int<lower=1> Nlv; 
+  int<lower=1> Na; 
+  
+  // Responses
+  matrix[No_morph, Nt] Y_morph; 
+  array[No_repro] int<lower=0> Y_repro; // Poisson count
+  array[No_surv] int<lower=0, upper=1> Y_surv; // Bernoulli 0/1
+  
+  // Pedigree & Links
+  array[No_morph] int<lower=1, upper=Na> animal_morph; 
+  array[No_repro] int<lower=1, upper=Na> animal_repro;
+  array[No_surv]  int<lower=1, upper=Na> animal_surv;
+  
+  array[Na] int<lower=1, upper=Na+1> dam; 
+  array[Na] int<lower=1, upper=Na+1> sire;
+  vector[Na] dii; 
+  
+  // Random Effects Indices
+  int<lower=1> N_year;
+  array[No_morph] int<lower=1, upper=N_year> year_morph;
+  array[No_repro] int<lower=1, upper=N_year> year_repro;
+  array[No_surv]  int<lower=1, upper=N_year> year_surv;
+  
+  int<lower=1> N_init;
+  array[No_morph] int<lower=1, upper=N_init> init_morph;
+}
+
+parameters {
+  // Intercepts (Since we dropped the X matrix)
+  vector[Nt] alpha_trait;
+  real alpha_repro;
+  real alpha_surv;
+
+  // Selection Gradients (The link between Size and Fitness!)
+  vector[Nlv] gamma_repro;
+  vector[Nlv] gamma_surv;
+
+  // Variances
+  vector<lower=0>[Nt] sd_R; 
+  // real<lower=0, upper=1> rho; 
+  vector<lower=0, upper=1>[Nlv] h2_lv; 
+  matrix[Nt, Nlv] lambda_raw;
+
+  // Latent Effects
+  matrix[Nlv, Na] w_a;  
+  matrix[Nlv, Na] w_pe; 
+  
+  // Random Effects (Year and Measurer)
+  matrix[N_year, Nt] z_year_morph;
+  vector<lower=0>[Nt] sd_year_morph;
+  
+  vector[N_year] z_year_repro;
+  real<lower=0> sd_year_repro;
+  
+  vector[N_year] z_year_surv;
+  real<lower=0> sd_year_surv;
+  
+  matrix[N_init, Nt] z_init_morph;
+  vector<lower=0>[Nt] sd_init_morph;
+}
+
+transformed parameters {
+  // 1. Pedigree Recursion
+  matrix[Na, Nlv] G_effect; 
+  {
+    matrix[Na+1, Nlv] aug_a;
+    aug_a[Na+1] = rep_row_vector(0, Nlv);
+    for (i in 1:Na) {
+       aug_a[i] = 0.5 * aug_a[dam[i]] + 0.5 * aug_a[sire[i]] 
+                  + sqrt(dii[i]) * w_a[, i]'; 
+    }
+    G_effect = aug_a[1:Na];
+  }
+
+  // 2. Latent Factor
+  matrix[Na, Nlv] LV;
+  for(k in 1:Nlv) {
+    LV[, k] = sqrt(h2_lv[k]) * G_effect[, k] + sqrt(1 - h2_lv[k]) * w_pe[k, ]';
+  }
+
+  // 3. Shrinkage
+  matrix[Nt, Nlv] Lambda;
+  Lambda[, 1] = lambda_raw[, 1];            
+  // Lambda[, 2] = lambda_raw[, 2] * sqrt(rho); 
+}
+
+model {
+  // Priors
+  // rho ~ beta(1.7, 2.5);
+  h2_lv ~ beta(2, 2); 
+  to_vector(lambda_raw) ~ std_normal();
+  sd_R ~ normal(0, 1);
+  
+  alpha_trait ~ normal(0, 2);
+  alpha_repro ~ normal(0, 2);
+  alpha_surv ~ normal(0, 2);
+  
+  gamma_repro ~ normal(0, 1);
+  gamma_surv ~ normal(0, 1);
+
+  to_vector(w_a) ~ std_normal();
+  to_vector(w_pe) ~ std_normal();
+  to_vector(z_year_morph) ~ std_normal();
+  z_year_repro ~ std_normal();
+  z_year_surv ~ std_normal();
+  to_vector(z_init_morph) ~ std_normal();
+  
+  sd_year_morph ~ exponential(2); 
+  sd_year_repro ~ exponential(2); 
+  sd_year_surv ~ exponential(2); 
+  sd_init_morph ~ exponential(2);
+
+  // --- LIKELIHOODS ---
+  
+  // 1. Morphology
+  for(i in 1:No_morph){
+    for(t in 1:Nt){
+      real mu = alpha_trait[t] 
+                + LV[animal_morph[i], 1] * Lambda[t, 1] 
+                // + LV[animal_morph[i], 2] * Lambda[t, 2]
+                + z_year_morph[year_morph[i], t] * sd_year_morph[t]
+                + z_init_morph[init_morph[i], t] * sd_init_morph[t];
+      Y_morph[i, t] ~ normal(mu, sd_R[t]);
+    }
+  }
+  
+
+  for(i in 1:No_repro){
+    real log_lambda = alpha_repro 
+                      + gamma_repro[1] * LV[animal_repro[i], 1] 
+                      + z_year_repro[year_repro[i]] * sd_year_repro;
+    Y_repro[i] ~ poisson_log(log_lambda);
+  }
+  
+  // 3. Survival (Bernoulli)
+  for(i in 1:No_surv){
+    real logit_p = alpha_surv 
+                   + gamma_surv[1] * LV[animal_surv[i], 1] 
+                   + z_year_surv[year_surv[i]] * sd_year_surv;
+    Y_surv[i] ~ bernoulli_logit(logit_p);
+  }
+}
+
+
+
+```
+
+
+
+This run with 1 latent variable on the 5 traits, with survival and reproduction added led to these successful results (this was without all the fixed and random effects by the way):
+
+:::{.output}
+Chain 4:                16775.2 seconds (Total)
+Chain 4:
+Inference for Stan model: anon_model.
+4 chains, each with iter=6000; warmup=2000; thin=1;
+post-warmup draws per chain=4000, total post-warmup draws=16000.
+
+                      mean se_mean     sd      2.5%     97.5% n_eff  Rhat
+alpha_trait[1]      -0.022   0.001  0.057    -0.131     0.091  4522 1.001
+alpha_trait[2]       0.037   0.001  0.064    -0.089     0.162  4292 1.001
+alpha_trait[3]       0.022   0.001  0.065    -0.103     0.150  3924 1.001
+alpha_trait[4]       0.202   0.001  0.079     0.050     0.361  3457 1.000
+alpha_trait[5]       0.111   0.001  0.071    -0.027     0.250  3974 1.001
+alpha_repro         -0.354   0.002  0.100    -0.553    -0.156  2557 1.001
+alpha_surv           0.186   0.001  0.085     0.015     0.354  6752 1.000
+gamma_repro[1]       0.074   0.000  0.024     0.026     0.122 30770 1.000
+gamma_surv[1]        0.115   0.000  0.042     0.033     0.196 30325 1.000
+Lambda[1,1]          0.970   0.000  0.020     0.931     1.011  2055 1.003
+Lambda[2,1]          0.226   0.000  0.015     0.196     0.255 13184 1.000
+Lambda[3,1]          0.158   0.000  0.015     0.129     0.187 21086 1.000
+Lambda[4,1]          0.119   0.000  0.015     0.091     0.149 24667 1.000
+Lambda[5,1]          0.316   0.000  0.016     0.286     0.347  8836 1.001
+h2_lv[1]             0.472   0.001  0.046     0.382     0.559  1366 1.003
+sd_R[1]              0.189   0.000  0.003     0.184     0.194  9801 1.000
+sd_R[2]              0.905   0.000  0.010     0.886     0.924 35016 1.000
+sd_R[3]              0.916   0.000  0.010     0.896     0.935 31259 1.000
+sd_R[4]              0.902   0.000  0.010     0.883     0.921 33600 1.000
+sd_R[5]              0.891   0.000  0.010     0.872     0.910 37002 1.000
+sd_year_morph[1]     0.019   0.000  0.010     0.001     0.042  3976 1.002
+sd_year_morph[2]     0.207   0.001  0.041     0.139     0.297  5018 1.001
+sd_year_morph[3]     0.173   0.000  0.034     0.116     0.250  6459 1.000
+sd_year_morph[4]     0.262   0.001  0.054     0.171     0.382  4735 1.000
+sd_year_morph[5]     0.254   0.001  0.049     0.172     0.365  4871 1.001
+sd_year_repro        0.443   0.001  0.078     0.316     0.621  4296 1.001
+sd_year_surv         0.344   0.001  0.069     0.232     0.505  6477 1.000
+sd_init_morph[1]     0.160   0.000  0.019     0.128     0.203  3337 1.000
+sd_init_morph[2]     0.278   0.001  0.039     0.210     0.365  4960 1.001
+sd_init_morph[3]     0.322   0.001  0.046     0.243     0.422  4875 1.000
+sd_init_morph[4]     0.341   0.001  0.046     0.261     0.442  4573 1.000
+sd_init_morph[5]     0.275   0.001  0.042     0.204     0.365  4956 1.001
+lp__             -8920.553   1.288 68.006 -9055.994 -8789.629  2786 1.002
+
+Samples were drawn using NUTS(diag_e) at Fri Feb 27 15:52:35 2026.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at
+convergence, Rhat=1).
+:::
+
+
+
+
+By the way, it turns out we are removing approximately 61 rows (out of a total of 4424) that do not have a sex value. So the question is whether it is worth it to include them (by finding the sex from a different place)?
+
+
+
+
+
+
+
+
+```{r}
+# ==============================================================================
+# 6. RESULTS & DIAGNOSTICS
+# ==============================================================================
+# out_lv <- readRDS('Output_everything_model.rds')
+
+# Print the parameters specific to the Joint Starter model
+print(out_lv,
+      pars = c("beta_morph", "beta_repro", "beta_surv",
+               "gamma_repro", "gamma_surv", "Lambda", "sd_R", 
+               "sd_year_morph", "sd_year_repro", "sd_year_surv", "sd_init_morph", 
+               "h2_lv",
+               "rho",    # Measurer variance for morphology
+               "lp__"),             # Log-posterior (model fit)
+      probs = c(0.025, 0.975),
+      digits_summary = 3)
+
+
+
+
+# Plot the main loading matrix and shrinkage
+library(rstan)
+
+# Use your actual fit object name (e.g., out_joint)
+stan_trace(out_lv, pars = c("Lambda", "rho"))
+
+# Look specifically at the Selection Gradients for the 2nd LV
+stan_trace(out_lv, pars = c("gamma_repro", "gamma_surv"))
+
+# Plot the main loading matrix and shrinkage
+
+stan_trace(out_lv, pars = c("beta_morph[2,3]", "beta_morph[2,4]", "beta_morph[2,5]", 
+                            "beta_morph[3,3]", "beta_morph[3,4]", "beta_morph[3,5]",
+                            "beta_morph[4,3]", "beta_morph[4,4]", "beta_morph[4,5]"))
+
+
+
+```
+
+Alright, so it mght be an issue that both age and season (as fixed effects) are sturggling against the latent variables for being the source of variance. In any case it seems for the most part that also in the case of the beta's not converging it's mainly chain 4's fault. 
+
+Below are the results of the full run with a bunch of both fixed and random effects and also repro and surv added. It failed. Notice that also some of the beta's are not converged. This could be the result of a "tug-of-war" between the fixed effects and the latent variables, for example age is a fixed effect, but that also accounts for variation in general body size, so having that independent of the LV causes the model to not understand where to put the variation, and that could lead to convergence issues.
+
+
+Inference for Stan model: anon_model.
+4 chains, each with iter=6000; warmup=2000; thin=1; 
+post-warmup draws per chain=4000, total post-warmup draws=16000.
+
+                      mean se_mean     sd      2.5%     97.5% n_eff  Rhat
+beta_morph[1,1]     -0.032   0.001  0.057    -0.142     0.081  7807 1.000
+beta_morph[1,2]      0.208   0.001  0.065     0.081     0.338  4268 1.006
+beta_morph[1,3]      0.292   0.001  0.058     0.177     0.407  5281 1.003
+beta_morph[1,4]      0.347   0.003  0.077     0.197     0.498   908 1.014
+beta_morph[1,5]      0.065   0.001  0.068    -0.067     0.199  5037 1.005
+beta_morph[2,1]     -0.002   0.000  0.010    -0.022     0.017 21881 1.001
+beta_morph[2,2]     -0.828   0.000  0.026    -0.879    -0.776  6707 1.005
+beta_morph[2,3]     -0.946   0.021  0.040    -1.016    -0.863     4 1.423
+beta_morph[2,4]     -0.927   0.023  0.042    -0.997    -0.839     3 1.513
+beta_morph[2,5]     -0.304   0.013  0.036    -0.373    -0.233     8 1.142
+beta_morph[3,1]      0.040   0.000  0.012     0.017     0.063 23049 1.000
+beta_morph[3,2]     -0.011   0.000  0.033    -0.075     0.054 10614 1.004
+beta_morph[3,3]     -0.013   0.006  0.039    -0.090     0.065    46 1.028
+beta_morph[3,4]      0.261   0.006  0.038     0.187     0.337    47 1.027
+beta_morph[3,5]      0.250   0.001  0.043     0.166     0.333  1458 1.007
+beta_morph[4,1]     -0.005   0.000  0.012    -0.028     0.018 21404 1.000
+beta_morph[4,2]      0.402   0.001  0.033     0.336     0.466   571 1.011
+beta_morph[4,3]      0.107   0.015  0.044     0.021     0.193     8 1.139
+beta_morph[4,4]      0.344   0.018  0.045     0.257     0.429     7 1.186
+beta_morph[4,5]      0.321   0.009  0.045     0.232     0.409    23 1.050
+beta_repro[1]       -0.186   0.002  0.100    -0.388     0.008  3870 1.000
+beta_repro[2]       -0.411   0.000  0.048    -0.506    -0.315 27105 1.000
+beta_surv[1]         0.096   0.001  0.094    -0.087     0.283  9311 1.000
+beta_surv[2]         0.193   0.000  0.081     0.035     0.352 26845 1.000
+gamma_repro[1]       0.059   0.000  0.025     0.011     0.107 22693 1.000
+gamma_repro[2]       0.042   0.008  0.033    -0.024     0.104    18 1.063
+gamma_surv[1]        0.123   0.000  0.043     0.038     0.206 10126 1.000
+gamma_surv[2]        0.122   0.012  0.053     0.022     0.229    20 1.057
+Lambda[1,1]          0.969   0.000  0.020     0.930     1.010  3029 1.002
+Lambda[1,2]         -0.018   0.002  0.064    -0.151     0.109   874 1.002
+Lambda[2,1]          0.226   0.001  0.041     0.146     0.307  1126 1.005
+Lambda[2,2]          0.589   0.071  0.103     0.378     0.689     2 4.458
+Lambda[3,1]          0.166   0.001  0.028     0.109     0.225   747 1.007
+Lambda[3,2]          0.307   0.070  0.100     0.210     0.508     2 4.697
+Lambda[4,1]          0.121   0.001  0.031     0.058     0.187   743 1.007
+Lambda[4,2]          0.361   0.074  0.106     0.262     0.569     2 5.080
+Lambda[5,1]          0.311   0.001  0.026     0.258     0.363   983 1.005
+Lambda[5,2]          0.297   0.034  0.055     0.221     0.420     3 2.065
+sd_R[1]              0.187   0.000  0.003     0.182     0.192  9389 1.000
+sd_R[2]              0.586   0.058  0.083     0.518     0.741     2 7.307
+sd_R[3]              0.752   0.026  0.037     0.677     0.789     2 4.158
+sd_R[4]              0.726   0.032  0.046     0.635     0.771     2 5.081
+sd_R[5]              0.835   0.009  0.015     0.802     0.859     3 1.651
+sd_year_morph[1]     0.016   0.000  0.010     0.001     0.038  4992 1.000
+sd_year_morph[2]     0.128   0.001  0.035     0.072     0.207  3849 1.006
+sd_year_morph[3]     0.125   0.003  0.028     0.077     0.188    91 1.022
+sd_year_morph[4]     0.234   0.013  0.059     0.139     0.369    20 1.067
+sd_year_morph[5]     0.193   0.002  0.042     0.123     0.287   388 1.015
+sd_year_repro        0.442   0.001  0.076     0.315     0.610  5345 1.001
+sd_year_surv         0.347   0.001  0.070     0.232     0.503  7126 1.000
+sd_init_morph[1]     0.156   0.000  0.019     0.124     0.198  4464 1.000
+sd_init_morph[2]     0.265   0.001  0.035     0.206     0.343  2671 1.008
+sd_init_morph[3]     0.278   0.001  0.039     0.211     0.363  1323 1.011
+sd_init_morph[4]     0.318   0.001  0.041     0.247     0.409  5754 1.001
+sd_init_morph[5]     0.268   0.001  0.043     0.193     0.361  5383 1.005
+h2_lv[1]             0.471   0.001  0.046     0.381     0.560  1989 1.001
+h2_lv[2]             0.542   0.016  0.065     0.415     0.670    16 1.093
+rho                  0.158   0.030  0.113     0.031     0.456    14 1.084
+lp__             -7583.915   1.492 91.523 -7765.291 -7409.708  3762 1.003
+
+Samples were drawn using NUTS(diag_e) at Thu Mar  5 05:51:39 2026.
+For each parameter, n_eff is a crude measure of effective sample size,
+and Rhat is the potential scale reduction factor on split chains (at 
+convergence, Rhat=1).
+
+
+
+Now testing what happens if I remove the one chain that disagreed a lot with the others, chain 4. 
+But that isn't really good practice to remove one chain after the fact, but yeah: 
+
+```{r}
+library(rstan)
+
+
+
+post_array <- as.array(out_lv)
+
+ # 2. Subset the array to keep only chains 2, 3, and 4
+ # The second dimension of the array is the chain index
+ array_subset <- post_array[, 1:3, ]
+ 
+ 
+ new_summary <- monitor(array_subset, digits_summary = 3, print = FALSE)
+ 
+ # 2. Convert to a data frame or matrix to enable row-subsetting
+ new_summary_df <- as.data.frame(new_summary)
+ 
+ 
+
+ # 3. Use rstan's monitor function to generate a new summary table
+ # This will recalculate Mean, SD, n_eff, and R-hat for the remaining chains
+ 
+ # 4. View the specific parameters that were "messy" before
+ pars_to_check <- c("gamma_repro[1]", "gamma_repro[2]", 
+                    "gamma_surv[1]", "gamma_surv[2]", 
+                    "Lambda[1,1]", "Lambda[1,2]", 
+                    "Lambda[2,1]", "Lambda[2,2]", 
+                    "rho", "h2_lv[2]")
+ 
+ # 3. Print your parameters of interest
+ print(new_summary_df[pars_to_check, ])
+```
+
+
+                      mean      se_mean         sd         2.5%         25%         50%        75%
+gamma_repro[1]  0.05876032 0.0002661359 0.02524820  0.009481862  0.04175122  0.05915998 0.07640587
+gamma_repro[2]  0.04777510 0.0003172129 0.02986328 -0.010871722  0.02730378  0.04818482 0.06733020
+gamma_surv[1]   0.12208226 0.0004901230 0.04279028  0.037763686  0.09338545  0.12184798 0.15100881
+gamma_surv[2]   0.11208502 0.0005623019 0.04955137  0.014866939  0.07866373  0.11199741 0.14616805
+Lambda[1,1]     0.96976553 0.0005421117 0.02003019  0.931859582  0.95627350  0.96941554 0.98287756
+Lambda[1,2]    -0.01921731 0.0023323181 0.05477292 -0.142738853 -0.04933346 -0.01567230 0.01635498
+Lambda[2,1]     0.22380085 0.0016100168 0.03987824  0.149546045  0.19797763  0.22217643 0.24814697
+Lambda[2,2]     0.64693420 0.0007073727 0.02299174  0.600572777  0.63206784  0.64742157 0.66219629
+rho             0.13362541 0.0023481142 0.09816247  0.027553851  0.06450410  0.10327557 0.17425838
+h2_lv[2]        0.55484251 0.0023513491 0.06180481  0.434449028  0.51157360  0.55515390 0.59773809
+                    97.5% n_eff      Rhat valid            Q5         Q50        Q95    MCSE_Q2.5
+gamma_repro[1] 0.10700486  8802 1.0004085     1  0.0163985275  0.05915998 0.09930538 0.0009446112
+gamma_repro[2] 0.10743334  8826 1.0002299     1 -0.0009635907  0.04818482 0.09638510 0.0010513245
+gamma_surv[1]  0.20544156  7597 1.0002403     1  0.0525235148  0.12184798 0.19318054 0.0017109337
+gamma_surv[2]  0.20727535  7694 0.9998258     1  0.0305582623  0.11199741 0.19381430 0.0023681569
+Lambda[1,1]    1.01051147  1352 1.0011862     1  0.9374574698  0.96941554 1.00355302 0.0009286183
+Lambda[1,2]    0.07991625   550 1.0040894     1 -0.1159916319 -0.01567230 0.06274527 0.0065584238
+Lambda[2,1]    0.30945131   612 1.0029961     1  0.1610302094  0.22217643 0.29281746 0.0025564566
+Lambda[2,2]    0.69168214  1046 1.0016785     1  0.6091233641  0.64742157 0.68412126 0.0020906611
+rho            0.40826256  1734 1.0013450     1  0.0337616989  0.10327557 0.34081387 0.0010535992
+h2_lv[2]       0.67290882   682 1.0017496     1  0.4520669502  0.55515390 0.65596094 0.0028583820
+                   MCSE_Q25     MCSE_Q50     MCSE_Q75   MCSE_Q97.5      MCSE_SD Bulk_ESS Tail_ESS
+gamma_repro[1] 0.0004963538 0.0004024525 0.0004945841 0.0009398345 0.0002032631     8982     4495
+gamma_repro[2] 0.0005834702 0.0003947184 0.0005480688 0.0014949426 0.0002697446     8902     4460
+gamma_surv[1]  0.0009158824 0.0005036031 0.0007810828 0.0013057482 0.0003705827     7607     4188
+gamma_surv[2]  0.0008147991 0.0007712307 0.0010868857 0.0016850624 0.0004293244     7771     4687
+Lambda[1,1]    0.0005748420 0.0005895095 0.0005358934 0.0011162593 0.0003834128     1365     3118
+Lambda[1,2]    0.0026418117 0.0018097028 0.0018903110 0.0045931769 0.0016500709      575      739
+Lambda[2,1]    0.0014175238 0.0013694119 0.0018220951 0.0048068249 0.0011508057      627      915
+Lambda[2,2]    0.0008354725 0.0007201968 0.0007976987 0.0011090193 0.0005003262     1065     1768
+rho            0.0013674191 0.0019084002 0.0035337562 0.0085709880 0.0016606446     1616     2778
+h2_lv[2]       0.0029986225 0.0024574171 0.0029831721 0.0033503018 0.0016671106      692     1601
+
+
+
+
+
+```{r}
+# 1. Extract the 3D array from your Stan fit
+post_array <- as.array(out_lv)
+
+# 2. Define a quick function to get the Mean and 95% CI
+summarize_chain <- function(x) {
+  c(Mean = mean(x), 
+    `2.5%` = quantile(x, 0.025), 
+    `97.5%` = quantile(x, 0.975))
+}
+
+# 3. Apply the function to the lp__ parameter across the chains (dimension 2)
+cat("\n--- lp__ Summary Per Chain ---\n")
+lp_summary <- apply(post_array[, , "lp__"], MARGIN = 2, FUN = summarize_chain)
+print(round(lp_summary, 2))
+
+# 4. Do the same for rho to see exactly how Chain 4 differs numerically
+cat("\n--- rho Summary Per Chain ---\n")
+rho_summary <- apply(post_array[, , "rho"], MARGIN = 2, FUN = summarize_chain)
+print(round(rho_summary, 3))
+```
+Clearly significantly lower for the 4th chain on the lp, suggesting it has reached a local minimum. 
+
+
+Below is code to show denisty for rho for the different chains, along with some more diagnostic plots of the log posterior. 
+```{r}
+
+# Load the required libraries
+library(bayesplot)
+library(ggplot2)
+
+# 1. Convert your Stan fit object to an array (bayesplot prefers this format)
+# Replace 'out_joint' with whatever you named your loaded .rds model
+posterior_array <- as.array(out_lv)
+
+# 2. Plot the overlaid densities for each chain
+mcmc_dens_overlay(posterior_array, pars = c("rho")) +
+  ggtitle("Posterior Density of rho (Shrinkage Factor) per Chain") +
+  theme_minimal()
+
+# Optional: If you also want to see the combined density of just the "good" chains
+# (assuming chains 2, 3, and 4 are the converged ones)
+mcmc_dens(posterior_array[, 2:4, ], pars = c("rho")) +
+  ggtitle("Combined Posterior Density of rho (Chains 2-4 only)") +
+  theme_minimal()
+
+
+
+
+
+# Assuming your array is loaded as 'posterior_array'
+# (e.g., posterior_array <- as.array(out_joint))
+
+# Plot 1: The Elevation Trace
+# Are all chains at the same height?
+mcmc_trace(posterior_array, pars = "lp__") +
+  ggtitle("Traceplot of Log-Posterior (lp__) per Chain") +
+  theme_minimal()
+
+# Plot 2: The Elevation Density
+# Do the distributions perfectly overlap, or is one shifted left (lower)?
+mcmc_dens_overlay(posterior_array, pars = "lp__") +
+  ggtitle("Density of Log-Posterior (lp__) per Chain") +
+  theme_minimal()
+
+# Plot 3: The Scatterplot (Bob's suggestion)
+# This maps the GPS coordinate (rho) against the Elevation (lp__)
+# If you see two distinct clouds, you have a multimodal posterior!
+mcmc_scatter(posterior_array, pars = c("rho", "lp__")) +
+  ggtitle("Geometry of the Posterior: rho vs lp__") +
+  theme_minimal()
+```
+
+
+
+Now I'll check the results for the first model that didn't work for 2 latent variables on both morphology and fitness. This is from the R script combined_test_model.R (or that script might actually contain the 1 lv version which i did afterwards...). What I need to check is the chains and also the rho densities and also the log posteriors, and maybe more. 
+
+```{r}
+out_old <- readRDS('output_markov/Output_Joint_Starter.rds')
+
+print(out_old,
+      # pars = c(               "gamma_repro",       # Selection gradient: Size -> Reproduction!
+      #          "gamma_surv",        # Selection gradient: Size -> Survival!
+      #          "Lambda",            # Factor loadings (How traits build Size)
+      #          "h2_lv",             # Heritability of the Latent Size
+      #          "rho",               # Shrinkage factor
+      #          "sd_R",              # Residual error for morph traits
+      #          "sd_year_morph",     # Year variance for morphology
+      #          "sd_year_repro",     # Year variance for reproduction
+      #          "sd_year_surv",      # Year variance for survival
+      #          "sd_init_morph",     # Measurer variance for morphology
+      #          "lp__"),             # Log-posterior (model fit)
+      probs = c(0.025, 0.975),
+      digits_summary = 3)
+```
+
+
+
+```{r}
+library(bayesplot)
+library(ggplot2)
+
+# 1. Plot a stable parameter (The Grand Mean)
+color_scheme_set("mix-blue-red")
+p1 <- mcmc_trace(out_old, pars = c("alpha_trait[1]", "sd_year_surv")) +
+  ggtitle("Stable Parameters (Rhat = 1.00)")
+
+# 2. Plot the 'Flipped' parameters
+p2 <- mcmc_trace(out_old, pars = c("Lambda[1,1]", "gamma_repro[1]", "gamma_surv[1]")) +
+  ggtitle("Sign-Flipped Parameters (High Rhat)")
+
+p3 <- mcmc_trace(out_old, pars = c("Lambda[1,2]", "Lambda[3,2]", "gamma_repro[2]", "gamma_surv[2]"))
+
+p4 <- mcmc_trace(out_old, pars = c("Lambda[2,1]", "Lambda[1,2]", "Lambda[3,1]", "Lambda[2,2]"))
+
+  
+
+# Show the plots
+print(p1)
+print(p2)
+print(p3)
+print(p4)
+```
+```{r}
+
+# Load the required libraries
+library(bayesplot)
+library(ggplot2)
+
+# 1. Convert your Stan fit object to an array (bayesplot prefers this format)
+# Replace 'out_joint' with whatever you named your loaded .rds model
+posterior_array <- as.array(out_old)
+
+# 2. Plot the overlaid densities for each chain
+mcmc_dens_overlay(posterior_array, pars = c("rho")) +
+  ggtitle("Posterior Density of rho (Shrinkage Factor) per Chain") +
+  theme_minimal()
+
+# Optional: If you also want to see the combined density of just the "good" chains
+# (assuming chains 2, 3, and 4 are the converged ones)
+mcmc_dens(posterior_array[, 2:4, ], pars = c("rho")) +
+  ggtitle("Combined Posterior Density of rho (Chains 2-4 only)") +
+  theme_minimal()
+
+
+
+
+
+# Assuming your array is loaded as 'posterior_array'
+# (e.g., posterior_array <- as.array(out_joint))
+
+# Plot 1: The Elevation Trace
+# Are all chains at the same height?
+mcmc_trace(posterior_array, pars = "lp__") +
+  ggtitle("Traceplot of Log-Posterior (lp__) per Chain") +
+  theme_minimal()
+
+# Plot 2: The Elevation Density
+# Do the distributions perfectly overlap, or is one shifted left (lower)?
+mcmc_dens_overlay(posterior_array, pars = "lp__") +
+  ggtitle("Density of Log-Posterior (lp__) per Chain") +
+  theme_minimal()
+
+# Plot 3: The Scatterplot (Bob's suggestion)
+# This maps the GPS coordinate (rho) against the Elevation (lp__)
+# If you see two distinct clouds, you have a multimodal posterior!
+mcmc_scatter(posterior_array, pars = c("rho", "lp__")) +
+  ggtitle("Geometry of the Posterior: rho vs lp__") +
+  theme_minimal()
+
+
+# 1. Extract the 3D array from your Stan fit
+
+# 2. Define a quick function to get the Mean and 95% CI
+summarize_chain <- function(x) {
+  c(Mean = mean(x), 
+    `2.5%` = quantile(x, 0.025), 
+    `97.5%` = quantile(x, 0.975))
+}
+
+# 3. Apply the function to the lp__ parameter across the chains (dimension 2)
+cat("\n--- lp__ Summary Per Chain ---\n")
+lp_summary <- apply(posterior_array[, , "lp__"], MARGIN = 2, FUN = summarize_chain)
+print(round(lp_summary, 2))
+
+# 4. Do the same for rho to see exactly how Chain 4 differs numerically
+cat("\n--- rho Summary Per Chain ---\n")
+rho_summary <- apply(posterior_array[, , "rho"], MARGIN = 2, FUN = summarize_chain)
+print(round(rho_summary, 3))
+
+```
+So, it looks like, contrary to the latest run, this older run actually had two equally good modes, as you can see that the posterior mean for the lp for chain 1 (doing its own thing) is almost exactly the same as the others. 
+
+
+Here are the results for the latest run. This is a run where I put a beta(1,2) prior on rho. And I didn't include that many fixed effects (or really none). The script is the one called something with "hopefully". 
+```{r}
+out_hopeful <- readRDS("output_markov/Output_hopefully.rds")
+print(out_hopeful, probs = c(0.025, 0.975), digits_summary = 3)
+``` 
+Now, this looks like some issues with mixing again, so we need to investigate. It seems the betas and the residuals are looking fine though, the and rho is also looking okay, so it might just be a case of sign flipping (although that shouldn't be possible anymore). So we need to look at the chains. 
+
+```{r}
+library(bayesplot)
+library(ggplot2)
+
+color_scheme_set("mix-blue-red")
+
+chains1 <- mcmc_trace(out_hopeful, pars = c("Lambda[1,1]", "Lambda[1,2]", "Lambda[3,1]", "Lambda[3,2]"))
+chains2 <- mcmc_trace(out_hopeful, pars = c("gamma_repro[1]", "gamma_repro[2]", "gamma_surv[1]", "gamma_surv[2]", "rho"))
+chains3 <- mcmc_trace(out_hopeful, pars = c("Lambda[2,1]", "Lambda[2,2]", "Lambda[4,1]", "Lambda[4,2]", "Lambda[5,1]", "Lambda[5,2]"))
+chains4 <- mcmc_trace(out_hopeful, pars= c("lp__", "h2_lv[1]", "h2_lv[2]"))
+
+print(chains1)
+print(chains2)
+print(chains3)
+print(chains4)
+
+
+
+```
+
+Alright, it looks like there are two possible modes that have multiple chains each. So we need to check some densities and log posteriors. 
+
+```{r}  
+posterior_array_2 <- as.array(out_hopeful)
+
+mcmc_dens_overlay(posterior_array_2, pars = c("rho")) +
+  ggtitle("Posterior Density of rho (Shrinkage Factor) per Chain") +
+  theme_minimal()
+
+```
+
+Alright it looks like there are 3 chains in each case, and they seem to slightly disagree on the distribution of rho.
+
+```{r}
+mcmc_dens_overlay(posterior_array_2, pars = "lp__") +
+  ggtitle("Density of Log-Posterior (lp__) per Chain") +
+  theme_minimal()
+```
+
+Okay, so the log posteriors seem to be slightly different for the two modes. 
+
+```{r}
+summarize_chain <- function(x) {
+  c(Mean = mean(x), 
+    `2.5%` = quantile(x, 0.025), 
+    `97.5%` = quantile(x, 0.975))
+}
+
+# 3. Apply the function to the lp__ parameter across the chains (dimension 2)
+cat("\n--- lp__ Summary Per Chain ---\n")
+lp_summary <- apply(posterior_array_2[, , "lp__"], MARGIN = 2, FUN = summarize_chain)
+print(round(lp_summary, 2))
+
+# 4. Do the same for rho to see exactly how Chain 4 differs numerically
+cat("\n--- rho Summary Per Chain ---\n")
+rho_summary <- apply(posterior_array_2[, , "rho"], MARGIN = 2, FUN = summarize_chain)
+print(round(rho_summary, 3))
+```
+
+It seems the mode with rho around 0.28 has somewhat higher log posteriors, by approximately 5 log units, compared to the mode with rho around 0.34-0.35, and 5 log units is a significant difference. But the differences within each mode is also quite large, so the 5 log unit difference is quite fuzzy. 
+
+Now, one question is, can I just take the log posterior and say that, hey, this mode has a significantly higher log posterior, so this is the better mode, and then ignore the other one? If not, how do I prevent this duality in the run? Should I just tweak the priors even more or the initialization to avoid the model from going into the "bad" mode?
+
+But in any case, it seems the model finds evidence for a second latent variable for these data, although that isn't exactly shown without a regularization or something, I suppose. 
+
+What is interesting is that even though the model seems to respect the rho, the loadings seem to be about the same magnitude in both modes. If the hypothesis that the body size is the latent variable representing the most variance, it would not make sense that the rho would be only about 0.3 if the first LV represents shape in one of the modes. Then the rho would have to be like 3 or something. One possibility is that it is the lambda_raw that gets blown up, to accommodate the requirement for both rho and the actual loadings. But the lambda_raw has a standard normal prior (I think), this might need to be tightened, or I'm not exactly sure what can be done except constraining some loadings.  
