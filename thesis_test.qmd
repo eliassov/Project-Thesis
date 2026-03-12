@@ -1332,8 +1332,22 @@ By the way, I think it actually was the model with the body size as the second l
 
 *Run with just stricter priors on the second factor*
 
-Alright, now I ran a model without rho (just computing it after the fact as a generated quantity), and just using much narrower priors on the loadings of the second latent variable. However, I had constrained the loadings lambda_1_1 and lambda_2_2 to be positive, which caused the model to be forced to have the second factor be the body size factor, and inflated the rho to around 1.9 even though I had a normal(0, 0.2) prior on the loadings of the second factor and a standard normal on the loadings of the first factor, causing the model to be forced to fight the prior. So it seems the best way after all is to just fix any sign flipping after the run, and not constrain any loadings to be positive (or zero). 
+
+Alright, now I ran a model without rho (just computing it after the fact as a generated quantity), and just using much narrower priors on the loadings of the second latent variable. 
+
+
+```{r}
+out_just_prior <- readRDS("output_markov/Output_hopefully_no_rho.rds")
+
+print(out_just_prior, probs = c(0.025, 0.975), digits_summary = 3)
+```
+
+However, I had constrained the loadings lambda_1_1 and lambda_2_2 to be positive, which caused the model to be forced to have the second factor be the body size factor, and inflated the rho to around 1.9 even though I had a normal(0, 0.2) prior on the loadings of the second factor and a standard normal on the loadings of the first factor, causing the model to be forced to fight the prior. So it seems the best way after all is to just fix any sign flipping after the run, and not constrain any loadings to be positive (or zero). 
 
 Now, the results show that the factor that was the shape factor actually had a positive correlation with the wing and negative with the others, suggesting a different shape factor than the ones previously found (I think). Whether this means that there are grounds for a third latent variable or whether this was a result of the weird model fitting caused by the positive constraint is not clear to me, but it seems it is a valid factor in any case. It could also suggest that the ground for a single shape factor is weak, and when forced to find a single shape factor, the model jumps between different possibilities. 
+
+The next step then, is to run the model without any positive constraints, but I'll ask Bob first. 
+
+When it comes to why the model with the rho using a beta prior had difficulties settling between the two modes, I think the best explanation is that it could just inflate the lambda_raw, to accommodate the requirement for both rho and the actual loadings, and that the model had difficulties finding a good balance between these two, which is why it had difficulties settling on one mode. 
 
 
