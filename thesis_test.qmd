@@ -470,7 +470,7 @@ print(p3)
 
 ```
 
-A quick check here showed that there were quite a few birds that were phenotyped but that were not in the fitness data, so that we are missing about 30 percent of the measurements if we only select birds that are in all data sets. So, the solution here might be to keep all phenotyped birds, but only have fitness data for the ones that have that, and that is possible to do as far as I know. 
+A quick check here showed that there were quite a few birds that were phenotyped but that were not in the fitness data, so that we are missing about 30 percent of the measurements if we only select birds that are in all data sets. So, the solution here might be to keep all phenotyped birds, but only have fitness data for the ones that have that, and that is possible to do as far as I know. (Turns out that's what we're doing, all birds in the pedigree are taken into account, but only the information available at each row of data (be it fitness data or morphology data) is used, and we don't need all data at each row or for each bird for it to work).
 
 
 ```{stan}
@@ -730,9 +730,9 @@ stan_trace(out_lv, pars = c("beta_morph[2,3]", "beta_morph[2,4]", "beta_morph[2,
 
 ```
 
-Alright, so it mght be an issue that both age and season (as fixed effects) are sturggling against the latent variables for being the source of variance. In any case it seems for the most part that also in the case of the beta's not converging it's mainly chain 4's fault. 
+Alright, so it might be an issue that both age and season (as fixed effects) are struggling against the latent variables for being the source of variance. In any case it seems for the most part that also in the case of the beta's not converging it's mainly chain 4's fault. 
 
-Below are the results of the full run with a bunch of both fixed and random effects and also repro and surv added. It failed. Notice that also some of the beta's are not converged. This could be the result of a "tug-of-war" between the fixed effects and the latent variables, for example age is a fixed effect, but that also accounts for variation in general body size, so having that independent of the LV causes the model to not understand where to put the variation, and that could lead to convergence issues.
+Below are the results of the full run with a bunch of both fixed and random effects and also reproduction and survival added. It failed. Notice that also some of the beta's are not converged. This could be the result of a "tug-of-war" between the fixed effects and the latent variables, for example age is a fixed effect, but that also accounts for variation in general body size, so having that independent of the LV causes the model to not understand where to put the variation, and that could lead to convergence issues.
 
 
 Inference for Stan model: anon_model.
@@ -879,7 +879,7 @@ rho            0.0013674191 0.0019084002 0.0035337562 0.0085709880 0.0016606446 
 h2_lv[2]       0.0029986225 0.0024574171 0.0029831721 0.0033503018 0.0016671106      692     1601
 
 
-
+So much better results here. But should probably check the log posterior of the different chains. And can't just remove a chain I don't like.
 
 
 ```{r}
@@ -906,7 +906,7 @@ print(round(rho_summary, 3))
 Clearly significantly lower for the 4th chain on the lp, suggesting it has reached a local minimum. 
 
 
-Below is code to show denisty for rho for the different chains, along with some more diagnostic plots of the log posterior. 
+Below is code to show density for rho for the different chains, along with some more diagnostic plots of the log posterior. 
 ```{r}
 
 # Load the required libraries
@@ -1076,7 +1076,182 @@ print(round(rho_summary, 3))
 So, it looks like, contrary to the latest run, this older run actually had two equally good modes, as you can see that the posterior mean for the lp for chain 1 (doing its own thing) is almost exactly the same as the others. 
 
 
-Here are the results for the latest run. This is a run where I put a beta(1,2) prior on rho. And I didn't include that many fixed effects (or really none). The script is the one called something with "hopefully". 
+Now I'll run the 2 LV model with survival and reproduction but without any fixed effects, just measurer initials random effect and year random effect. 
+
+```{stan}
+data {
+  // Dimensions
+  int<lower=1> No_morph; 
+  int<lower=1> No_repro;
+  int<lower=1> No_surv;
+  int<lower=1> Nt;  
+  int<lower=1> Nlv; 
+  int<lower=1> Na;  
+
+  int<lower=0> K_morph;
+  int<lower=0> K_repro;
+  int<lower=0> K_surv;
+  
+  matrix[No_morph, K_morph] X_morph;
+  matrix[No_repro, K_repro] X_repro;
+  matrix[No_surv, K_surv] X_surv;
+  
+  // Responses
+  matrix[No_morph, Nt] Y_morph; 
+  array[No_repro] int<lower=0> Y_repro; // Poisson count
+  array[No_surv] int<lower=0, upper=1> Y_surv; // Bernoulli 0/1
+  
+  // Pedigree & Links
+  array[No_morph] int<lower=1, upper=Na> animal_morph; 
+  array[No_repro] int<lower=1, upper=Na> animal_repro;
+  array[No_surv]  int<lower=1, upper=Na> animal_surv;
+  
+  array[Na] int<lower=1, upper=Na+1> dam; 
+  array[Na] int<lower=1, upper=Na+1> sire;
+  vector[Na] dii; 
+  
+  // Random Effects Indices
+  int<lower=1> N_year;
+  array[No_morph] int<lower=1, upper=N_year> year_morph;
+  array[No_repro] int<lower=1, upper=N_year> year_repro;
+  array[No_surv]  int<lower=1, upper=N_year> year_surv;
+  
+  int<lower=1> N_init;
+  array[No_morph] int<lower=1, upper=N_init> init_morph;
+}
+
+parameters {
+  // Intercepts (Since we dropped the X matrix)
+  
+  matrix[K_morph, Nt] beta_morph;
+  vector[K_repro] beta_repro;
+  vector[K_surv] beta_surv;
+
+  // Selection Gradients (The link between Size and Fitness)
+  vector[Nlv] gamma_repro;
+  vector[Nlv] gamma_surv;
+
+  // Variances
+  vector<lower=0>[Nt] sd_R; 
+  real<lower=0, upper=1> rho;
+  vector<lower=0, upper=1>[Nlv] h2_lv; 
+  
+  matrix[Nt, Nlv] lambda_raw;
+  
+  real<lower=0> lambda_1_1;
+  real<lower=0> lambda_2_2;
+
+  // Latent Effects
+  matrix[Nlv, Na] w_a;  
+  matrix[Nlv, Na] w_pe; 
+  
+  // Random Effects (Year and Measurer)
+  matrix[N_year, Nt] z_year_morph;
+  vector<lower=0>[Nt] sd_year_morph;
+  
+  vector[N_year] z_year_repro;
+  real<lower=0> sd_year_repro;
+  
+  vector[N_year] z_year_surv;
+  real<lower=0> sd_year_surv;
+  
+  matrix[N_init, Nt] z_init_morph;
+  vector<lower=0>[Nt] sd_init_morph;
+}
+
+transformed parameters {
+  // 1. Pedigree Recursion
+  matrix[Na, Nlv] G_effect; 
+  {
+    matrix[Na+1, Nlv] aug_a;
+    aug_a[Na+1] = rep_row_vector(0, Nlv);
+    for (i in 1:Na) {
+       aug_a[i] = 0.5 * aug_a[dam[i]] + 0.5 * aug_a[sire[i]] 
+                  + sqrt(dii[i]) * w_a[, i]'; 
+    }
+    G_effect = aug_a[1:Na];
+  }
+
+  // 2. Latent Factor
+  matrix[Na, Nlv] LV;
+  for(k in 1:Nlv) {
+    LV[, k] = sqrt(h2_lv[k]) * G_effect[, k] + sqrt(1 - h2_lv[k]) * w_pe[k, ]';
+  }
+
+  matrix[Nt, Nlv] lambda_con;
+  lambda_con = lambda_raw;
+  lambda_con[1,1] = lambda_1_1;
+  lambda_con[2,2] = lambda_2_2;
+  
+  // 3. Shrinkage
+  matrix[Nt, Nlv] Lambda;
+  Lambda[, 1] = lambda_con[, 1];            
+  Lambda[, 2] = lambda_con[, 2] * sqrt(rho);
+}
+
+model {
+  // Priors
+  rho ~ beta(1, 2);
+  h2_lv ~ beta(2.5, 2.5); 
+  to_vector(lambda_raw) ~ std_normal();
+  sd_R ~ normal(0, 1);
+  
+  to_vector(beta_morph) ~ normal(0,1);
+  beta_repro ~ normal(0,1);
+  beta_surv ~ normal(0,1);
+  
+  gamma_repro ~ normal(0, 1);
+  gamma_surv ~ normal(0, 1);
+
+  to_vector(w_a) ~ std_normal();
+  to_vector(w_pe) ~ std_normal();
+  to_vector(z_year_morph) ~ std_normal();
+  z_year_repro ~ std_normal();
+  z_year_surv ~ std_normal();
+  to_vector(z_init_morph) ~ std_normal();
+  
+  sd_year_morph ~ exponential(2); 
+  sd_year_repro ~ exponential(2); 
+  sd_year_surv ~ exponential(2); 
+  sd_init_morph ~ exponential(2);
+
+  // --- LIKELIHOODS ---
+  
+  // 1. Morphology
+  for(i in 1:No_morph){
+    for(t in 1:Nt){
+      real mu =  
+                dot_product(X_morph[i], beta_morph[, t])
+                + LV[animal_morph[i], 1] * Lambda[t, 1] 
+                + LV[animal_morph[i], 2] * Lambda[t, 2]
+                + z_year_morph[year_morph[i], t] * sd_year_morph[t]
+                + z_init_morph[init_morph[i], t] * sd_init_morph[t];
+      Y_morph[i, t] ~ normal(mu, sd_R[t]);
+    }
+  }
+  
+// // 2. Reproduction (Poisson)
+  for(i in 1:No_repro){
+    real log_lambda =  dot_product(X_repro[i], beta_repro)
+                      + gamma_repro[1] * LV[animal_repro[i], 1]
+                      + gamma_repro[2] * LV[animal_repro[i], 2]
+                      + z_year_repro[year_repro[i]] * sd_year_repro;
+    Y_repro[i] ~ poisson_log(log_lambda);
+  }
+
+  // 3. Survival (Bernoulli)
+  for(i in 1:No_surv){
+    real logit_p = dot_product(X_surv[i], beta_surv)
+                    + gamma_surv[1] * LV[animal_surv[i], 1]
+                   + gamma_surv[2] * LV[animal_surv[i], 2]
+                   + z_year_surv[year_surv[i]] * sd_year_surv;
+    Y_surv[i] ~ bernoulli_logit(logit_p);
+  }
+
+}
+```
+
+Here are the results from this latest run. This is a run where I put a beta(1,2) prior on rho. And I didn't include that many fixed effects (or really any). The script is the one called something with "hopefully". 
 ```{r}
 out_hopeful <- readRDS("output_markov/Output_hopefully.rds")
 print(out_hopeful, probs = c(0.025, 0.975), digits_summary = 3)
@@ -1148,4 +1323,17 @@ Now, one question is, can I just take the log posterior and say that, hey, this 
 
 But in any case, it seems the model finds evidence for a second latent variable for these data, although that isn't exactly shown without a regularization or something, I suppose. 
 
-What is interesting is that even though the model seems to respect the rho, the loadings seem to be about the same magnitude in both modes. If the hypothesis that the body size is the latent variable representing the most variance, it would not make sense that the rho would be only about 0.3 if the first LV represents shape in one of the modes. Then the rho would have to be like 3 or something. One possibility is that it is the lambda_raw that gets blown up, to accommodate the requirement for both rho and the actual loadings. But the lambda_raw has a standard normal prior (I think), this might need to be tightened, or I'm not exactly sure what can be done except constraining some loadings.  
+What is interesting is that even though the model seems to respect the rho, the loadings seem to be about the same magnitude in both modes. If the hypothesis that the body size is the latent variable representing the most variance, it would not make sense that the rho would be only about 0.3 if the first LV represents shape in one of the modes. Then the rho would have to be like 3 or something. One possibility is that it is the lambda_raw that gets blown up, to accommodate the requirement for both rho and the actual loadings. But the lambda_raw has a standard normal prior (I think), this might need to be tightened, or I'm not exactly sure what can be done except constraining some loadings.
+
+Alright, one possibility is to constrain the priors of the loadings for the second latent variable to have a lower standard deviation, and forget about rho (or estimate it after the fact could be done probably).  Another option could potentially be to constrain lambda_raw (or equivalent) to only be sampled within a smaller interval of say -1.5 to 1.5. 
+
+By the way, I think it actually was the model with the body size as the second latent variable that had the highest log posterior in the latest run, but need to doublecheck this.
+
+
+*Run with just stricter priors on the second factor*
+
+Alright, now I ran a model without rho (just computing it after the fact as a generated quantity), and just using much narrower priors on the loadings of the second latent variable. However, I had constrained the loadings lambda_1_1 and lambda_2_2 to be positive, which caused the model to be forced to have the second factor be the body size factor, and inflated the rho to around 1.9 even though I had a normal(0, 0.2) prior on the loadings of the second factor and a standard normal on the loadings of the first factor, causing the model to be forced to fight the prior. So it seems the best way after all is to just fix any sign flipping after the run, and not constrain any loadings to be positive (or zero). 
+
+Now, the results show that the factor that was the shape factor actually had a positive correlation with the wing and negative with the others, suggesting a different shape factor than the ones previously found (I think). Whether this means that there are grounds for a third latent variable or whether this was a result of the weird model fitting caused by the positive constraint is not clear to me, but it seems it is a valid factor in any case. It could also suggest that the ground for a single shape factor is weak, and when forced to find a single shape factor, the model jumps between different possibilities. 
+
+
