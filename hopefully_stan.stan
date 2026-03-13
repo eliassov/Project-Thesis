@@ -55,12 +55,7 @@ parameters {
   // real<lower=0, upper=1> rho;
   vector<lower=0, upper=1>[Nlv] h2_lv; 
   
-  matrix[Nt, Nlv] lambda_raw;
-  
-  real<lower=0> lambda_1_1;
-  vector[Nt-1] lambda_free_1;
-  real<lower=0> lambda_2_2;
-  vector[Nt-1] lambda_free_2;
+  matrix[Nt, Nlv] Lambda;
 
 
   // Latent Effects
@@ -101,32 +96,16 @@ transformed parameters {
   }
 
 
-  matrix[Nt, Nlv] Lambda = rep_matrix(0.0, Nt, Nlv);
-  
-  Lambda[1,1] = lambda_1_1;
-  
-  for (t in 2:Nt) {
-    Lambda[t, 1] = lambda_free_1[t-1];
-  }
-  
-  Lambda[2,2] = lambda_2_2;
-  Lambda[1,2] = lambda_free_2[1];
-  
-  for (t in 3:Nt) {
-    Lambda[t, 2] = lambda_free_2[t-2];
-  }
-
 }
 
 model {
   // Priors
   // rho ~ beta(1, 2);
   h2_lv ~ beta(2.5, 2.5); 
-  lambda_1_1 ~ normal(0, 1.0);
-  lambda_free_1 ~ normal(0, 1.0);
   
-  lambda_2_2 ~ normal(0, 0.2);
-  lambda_free_2 ~ normal(0, 0.2);
+  Lambda[, 1] ~ normal(0, 1.0);
+  
+  Lambda[, 2] ~ normal(0, 0.2);
 
   sd_R ~ normal(0, 1);
   

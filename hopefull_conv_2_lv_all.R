@@ -451,9 +451,9 @@ out_joint <- stan(
            "h2_lv"
            , "rho"
   ),
-  control = list(adapt_delta = 0.93), 
-  iter = 5000,          
-  warmup = 2500
+  control = list(adapt_delta = 0.95), 
+  iter = 6000,          
+  warmup = 3000
 )
 
 saveRDS(out_joint, 'Output_hopefully_no_rho.rds')
