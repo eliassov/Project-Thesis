@@ -391,11 +391,12 @@ options(mc.cores = parallel::detectCores())
 
 init_fn_joint <- function() {
   
+  L_init <- matrix(0, nrow = dataset_joint$Nt, ncol = dataset_joint$Nlv)
+  L_init[, 1] <- rnorm(dataset_joint$Nt, 0.5, 0.1) # Size (mostly positive)
+  L_init[, 2] <- rnorm(dataset_joint$Nt, 0, 0.05)   # Shape (small noise)
+  
   list(
-    lambda_1_1 = runif(1, 0.5, 1.2),
-    lambda_free_1 = as.array(rnorm(dataset_joint$Nt - 1, 0, 0.1)),
-    lambda_2_2 = runif(1, 0.2, 0.6),
-    lambda_free_2 = as.array(rnorm(dataset_joint$Nt - 1, 0, 0.1)),
+    Lambda = L_init,
     
     h2_lv = as.array(runif(dataset_joint$Nlv, 0.4, 0.6)),
     sd_R = as.array(runif(dataset_joint$Nt, 0.5, 1.0)),
