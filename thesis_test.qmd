@@ -1545,6 +1545,8 @@ print(chains4)
 ```
 So it is clear from these results that the second latent variable is sign flipped between the chains. Now, I will correct the chains that are flipped for the second variable. The flipped chain are 2 and 4 vs 1 and 3. So I will flip the sign of the second latent variable for chains 2 and 4, and then combine the chains and check the results.
 
+And as can be seen from the log posteriors, the chains all have around the same value, so it doesn't seem like there are multiple different universes that are being explored. 
+
 ```{r}
 
 # Extract the posterior samples as an array
@@ -1588,26 +1590,80 @@ params_to_check <- c("Lambda[1,2]", "Lambda[2,2]", "Lambda[3,2]",
 ```{r}
 library(posterior)
 
-# 1. Convert the modified array to a 'draws' object
-# This handles the internal naming much better
+# 1. Convert to draws array
 draws_corrected <- as_draws_array(posterior_array_no_pos)
 
-# 2. Get the summary without the row name error
+# 2. Get the summary
 summary_tab <- summarise_draws(draws_corrected)
 
-# 3. Look at your specific parameters
-subset_summary <- summary_tab[summary_tab$variable %in% params_to_check, ]
+# 3. THE FIX: Strip the fancy 'posterior' formatting and make it a basic data frame
+summary_df <- as.data.frame(summary_tab)
+
+# 4. Subset and print safely
+params_to_check <- c("Lambda[1,2]", "Lambda[2,2]", "Lambda[3,2]", 
+                     "Lambda[4,2]", "Lambda[5,2]", 
+                     "gamma_repro[2]", "gamma_surv[2]")
+
+subset_summary <- summary_df[summary_df$variable %in% params_to_check, ]
 print(subset_summary)
 ```
 
 
 ```{r}
+library(bayesplot)
+library(ggplot2)
 
-print(summary_corrected[params_to_check, c("mean", "sd", "2.5%", "97.5%", "Rhat", "n_eff")])
+# Set a color scheme so it's easy to distinguish the 4 chains
+color_scheme_set("mix-blue-red")
 
-# 3. Final Verification Traceplot
-# This will visually confirm that the "red and blue" chains are now one single "cloud"
-mcmc_trace(posterior_array_no_pos, pars = c("Lambda[1,2]", "gamma_repro[2]")) +
-  ggtitle("Traceplots After Sign Correction (Chains 2 & 4 Flipped)") +
-  color_scheme_set("brightblue")
+# Select the variables with the worst R-hats and lowest ESS
+worst_vars <- c("Lambda[1,2]", "Lambda[2,2]", "Lambda[4,2]", "gamma_surv[2]")
+
+# Plot the modified array
+plot_flipped_chains <- mcmc_trace(posterior_array_no_pos, pars = worst_vars) +
+  ggtitle("Traceplots AFTER Sign Correction (Chains 2 & 4 Flipped)") +
+  theme_minimal()
+
+print(plot_flipped_chains)
+```
+
+It looks like we're getting slow mixing and high autocorrelation. It doesn't seem like any of the chains are living in an entirely different universe from the others, as the chains are overlapping (no clear gap between them). We are getting R hats as high as 1.15, and n effs as low as 27, so it's not ideal. But running for more iterations could potentially help. 
+
+Here is a function to hopefully do the post-run sign flipping automatically for the chains that are flipped:
+
+```{r}
+auto_align_signs <- function(stan_array, factor_num, anchor_trait, n_traits = 5) {
+  # Get the number of chains from the array dimensions
+  n_chains <- dim(stan_array)[2]
+  
+  # Define the anchor parameter we are checking (e.g., "Lambda[1,1]")
+  anchor_param <- paste0("Lambda[", anchor_trait, ",", factor_num, "]")
+  
+  for (c in 1:n_chains) {
+    # Check if the mean of the anchor loading in this chain is negative
+    if (mean(stan_array[, c, anchor_param]) < 0) {
+      message(sprintf("Aligning Chain %d: Flipping signs for Factor %d", c, factor_num))
+      
+      # 1. Flip all Loadings (Lambda) for this factor
+      for (t in 1:n_traits) {
+        lam_name <- paste0("Lambda[", t, ",", factor_num, "]")
+        stan_array[, c, lam_name] <- -stan_array[, c, lam_name]
+      }
+      
+      # 2. Flip the Selection Gradients (gamma) for this factor
+      gamma_repro_name <- paste0("gamma_repro[", factor_num, "]")
+      gamma_surv_name  <- paste0("gamma_surv[", factor_num, "]")
+      
+      # We use if() checks just in case a model doesn't have both gammas
+      if (gamma_repro_name %in% dimnames(stan_array)$parameters) {
+        stan_array[, c, gamma_repro_name] <- -stan_array[, c, gamma_repro_name]
+      }
+      if (gamma_surv_name %in% dimnames(stan_array)$parameters) {
+        stan_array[, c, gamma_surv_name] <- -stan_array[, c, gamma_surv_name]
+      }
+    }
+  }
+  
+  return(stan_array)
+}
 ```
