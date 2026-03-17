@@ -1504,3 +1504,110 @@ When it comes to why the model with the rho using a beta prior had difficulties 
 Okay, now I will change it so that I don't have the positive constraints on any lambdas. 
 
 
+
+Alright, now here are the results of the run without any positive constraints.
+
+```{r}
+
+out_no_pos <- readRDS("output_markov/Output_hopefully_no_pos.rds")
+
+
+print(out_no_pos, probs = c(0.025, 0.975), digits_summary = 3)
+```
+
+Seems like there could be a sign flipping issue (or hopefully that's what it is).
+
+Now, I'll check the chains.
+
+```{r}
+
+library(bayesplot)
+library(ggplot2)
+
+color_scheme_set("mix-blue-red")
+
+chains1 <- mcmc_trace(out_no_pos, pars = c("Lambda[1,1]", "Lambda[1,2]", "Lambda[3,1]", "Lambda[3,2]"))
+
+chains2 <- mcmc_trace(out_no_pos, pars = c("gamma_repro[1]", "gamma_repro[2]", "gamma_surv[1]", "gamma_surv[2]", "rho"))
+
+chains3 <- mcmc_trace(out_no_pos, pars = c("Lambda[2,1]", "Lambda[2,2]", "Lambda[4,1]", "Lambda[4,2]", "Lambda[5,1]", "Lambda[5,2]"))
+
+
+
+
+chains4 <- mcmc_trace(out_no_pos, pars= c("lp__", "h2_lv[1]", "h2_lv[2]"))
+
+print(chains1)
+print(chains2)
+print(chains3)
+print(chains4)
+
+```
+So it is clear from these results that the second latent variable is sign flipped between the chains. Now, I will correct the chains that are flipped for the second variable. The flipped chain are 2 and 4 vs 1 and 3. So I will flip the sign of the second latent variable for chains 2 and 4, and then combine the chains and check the results.
+
+```{r}
+
+# Extract the posterior samples as an array
+posterior_array_no_pos <- as.array(out_no_pos)
+# Flip the sign of the second latent variable for chains 2 and 4
+posterior_array_no_pos[, c(2, 4), "Lambda[1,2]"] <- -posterior_array_no_pos[, c(2, 4), "Lambda[1,2]"]
+posterior_array_no_pos[, c(2, 4), "Lambda[2,2]"] <- -posterior_array_no_pos[, c(2, 4), "Lambda[2,2]"]
+posterior_array_no_pos[, c(2, 4), "Lambda[3,2]"] <- -posterior_array_no_pos[, c(2, 4), "Lambda[3,2]"]
+posterior_array_no_pos[, c(2, 4), "Lambda[4,2]"] <- -posterior_array_no_pos[, c(2, 4), "Lambda[4,2]"]
+posterior_array_no_pos[, c(2, 4), "Lambda[5,2]"] <- -posterior_array_no_pos[, c(2, 4), "Lambda[5,2]"]
+
+posterior_array_no_pos[, c(2, 4), "gamma_repro[2]"] <- -posterior_array_no_pos[, c(2, 4), "gamma_repro[2]"]
+posterior_array_no_pos[, c(2, 4), "gamma_surv[2]"] <- -posterior_array_no_pos[, c(2, 4), "gamma_surv[2]"]
+
+```
+
+Then we have to find the results with the 2 chains flipped.
+
+```{r}
+# 1. Combine the corrected array into a summary table
+# We use rstan::monitor to re-calculate R-hat and n_eff for the modified parameters
+# (Note: we only modified Lambda and gamma, so the others will stay the same)
+library(rstan)
+
+# Convert the modified array to a monitor object
+# 'warmup = 0' because we are using the post-warmup array already
+summary_corrected <- monitor(posterior_array_no_pos, warmup = 0, digits_summary = 3)
+
+# 2. View the corrected results for the parameters you flipped
+# This should now show R-hats very close to 1.000
+cat("\n--- Corrected Results for Lambda (Factor 2) and Gammas ---\n")
+params_to_check <- c("Lambda[1,2]", "Lambda[2,2]", "Lambda[3,2]", 
+                     "Lambda[4,2]", "Lambda[5,2]", 
+                     "gamma_repro[2]", "gamma_surv[2]")
+
+
+
+```
+
+
+```{r}
+library(posterior)
+
+# 1. Convert the modified array to a 'draws' object
+# This handles the internal naming much better
+draws_corrected <- as_draws_array(posterior_array_no_pos)
+
+# 2. Get the summary without the row name error
+summary_tab <- summarise_draws(draws_corrected)
+
+# 3. Look at your specific parameters
+subset_summary <- summary_tab[summary_tab$variable %in% params_to_check, ]
+print(subset_summary)
+```
+
+
+```{r}
+
+print(summary_corrected[params_to_check, c("mean", "sd", "2.5%", "97.5%", "Rhat", "n_eff")])
+
+# 3. Final Verification Traceplot
+# This will visually confirm that the "red and blue" chains are now one single "cloud"
+mcmc_trace(posterior_array_no_pos, pars = c("Lambda[1,2]", "gamma_repro[2]")) +
+  ggtitle("Traceplots After Sign Correction (Chains 2 & 4 Flipped)") +
+  color_scheme_set("brightblue")
+```
