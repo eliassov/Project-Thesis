@@ -472,7 +472,6 @@ print(p3)
 
 A quick check here showed that there were quite a few birds that were phenotyped but that were not in the fitness data, so that we are missing about 30 percent of the measurements if we only select birds that are in all data sets. So, the solution here might be to keep all phenotyped birds, but only have fitness data for the ones that have that, and that is possible to do as far as I know. (Turns out that's what we're doing, all birds in the pedigree are taken into account, but only the information available at each row of data (be it fitness data or morphology data) is used, and we don't need all data at each row or for each bird for it to work).
 
-
 ```{stan}
 data {
   // Dimensions
@@ -627,69 +626,21 @@ model {
 
 ```
 
-
-
 This run with 1 latent variable on the 5 traits, with survival and reproduction added led to these successful results (this was without all the fixed and random effects by the way):
 
-:::{.output}
-Chain 4:                16775.2 seconds (Total)
-Chain 4:
-Inference for Stan model: anon_model.
-4 chains, each with iter=6000; warmup=2000; thin=1;
-post-warmup draws per chain=4000, total post-warmup draws=16000.
+::: output
+Chain 4: 16775.2 seconds (Total) Chain 4: Inference for Stan model: anon_model. 4 chains, each with iter=6000; warmup=2000; thin=1; post-warmup draws per chain=4000, total post-warmup draws=16000.
 
-                      mean se_mean     sd      2.5%     97.5% n_eff  Rhat
-alpha_trait[1]      -0.022   0.001  0.057    -0.131     0.091  4522 1.001
-alpha_trait[2]       0.037   0.001  0.064    -0.089     0.162  4292 1.001
-alpha_trait[3]       0.022   0.001  0.065    -0.103     0.150  3924 1.001
-alpha_trait[4]       0.202   0.001  0.079     0.050     0.361  3457 1.000
-alpha_trait[5]       0.111   0.001  0.071    -0.027     0.250  3974 1.001
-alpha_repro         -0.354   0.002  0.100    -0.553    -0.156  2557 1.001
-alpha_surv           0.186   0.001  0.085     0.015     0.354  6752 1.000
-gamma_repro[1]       0.074   0.000  0.024     0.026     0.122 30770 1.000
-gamma_surv[1]        0.115   0.000  0.042     0.033     0.196 30325 1.000
-Lambda[1,1]          0.970   0.000  0.020     0.931     1.011  2055 1.003
-Lambda[2,1]          0.226   0.000  0.015     0.196     0.255 13184 1.000
-Lambda[3,1]          0.158   0.000  0.015     0.129     0.187 21086 1.000
-Lambda[4,1]          0.119   0.000  0.015     0.091     0.149 24667 1.000
-Lambda[5,1]          0.316   0.000  0.016     0.286     0.347  8836 1.001
-h2_lv[1]             0.472   0.001  0.046     0.382     0.559  1366 1.003
-sd_R[1]              0.189   0.000  0.003     0.184     0.194  9801 1.000
-sd_R[2]              0.905   0.000  0.010     0.886     0.924 35016 1.000
-sd_R[3]              0.916   0.000  0.010     0.896     0.935 31259 1.000
-sd_R[4]              0.902   0.000  0.010     0.883     0.921 33600 1.000
-sd_R[5]              0.891   0.000  0.010     0.872     0.910 37002 1.000
-sd_year_morph[1]     0.019   0.000  0.010     0.001     0.042  3976 1.002
-sd_year_morph[2]     0.207   0.001  0.041     0.139     0.297  5018 1.001
-sd_year_morph[3]     0.173   0.000  0.034     0.116     0.250  6459 1.000
-sd_year_morph[4]     0.262   0.001  0.054     0.171     0.382  4735 1.000
-sd_year_morph[5]     0.254   0.001  0.049     0.172     0.365  4871 1.001
-sd_year_repro        0.443   0.001  0.078     0.316     0.621  4296 1.001
-sd_year_surv         0.344   0.001  0.069     0.232     0.505  6477 1.000
-sd_init_morph[1]     0.160   0.000  0.019     0.128     0.203  3337 1.000
-sd_init_morph[2]     0.278   0.001  0.039     0.210     0.365  4960 1.001
-sd_init_morph[3]     0.322   0.001  0.046     0.243     0.422  4875 1.000
-sd_init_morph[4]     0.341   0.001  0.046     0.261     0.442  4573 1.000
-sd_init_morph[5]     0.275   0.001  0.042     0.204     0.365  4956 1.001
-lp__             -8920.553   1.288 68.006 -9055.994 -8789.629  2786 1.002
+```         
+                  mean se_mean     sd      2.5%     97.5% n_eff  Rhat
+```
 
-Samples were drawn using NUTS(diag_e) at Fri Feb 27 15:52:35 2026.
-For each parameter, n_eff is a crude measure of effective sample size,
-and Rhat is the potential scale reduction factor on split chains (at
-convergence, Rhat=1).
+alpha_trait\[1\] -0.022 0.001 0.057 -0.131 0.091 4522 1.001 alpha_trait\[2\] 0.037 0.001 0.064 -0.089 0.162 4292 1.001 alpha_trait\[3\] 0.022 0.001 0.065 -0.103 0.150 3924 1.001 alpha_trait\[4\] 0.202 0.001 0.079 0.050 0.361 3457 1.000 alpha_trait\[5\] 0.111 0.001 0.071 -0.027 0.250 3974 1.001 alpha_repro -0.354 0.002 0.100 -0.553 -0.156 2557 1.001 alpha_surv 0.186 0.001 0.085 0.015 0.354 6752 1.000 gamma_repro\[1\] 0.074 0.000 0.024 0.026 0.122 30770 1.000 gamma_surv\[1\] 0.115 0.000 0.042 0.033 0.196 30325 1.000 Lambda\[1,1\] 0.970 0.000 0.020 0.931 1.011 2055 1.003 Lambda\[2,1\] 0.226 0.000 0.015 0.196 0.255 13184 1.000 Lambda\[3,1\] 0.158 0.000 0.015 0.129 0.187 21086 1.000 Lambda\[4,1\] 0.119 0.000 0.015 0.091 0.149 24667 1.000 Lambda\[5,1\] 0.316 0.000 0.016 0.286 0.347 8836 1.001 h2_lv\[1\] 0.472 0.001 0.046 0.382 0.559 1366 1.003 sd_R\[1\] 0.189 0.000 0.003 0.184 0.194 9801 1.000 sd_R\[2\] 0.905 0.000 0.010 0.886 0.924 35016 1.000 sd_R\[3\] 0.916 0.000 0.010 0.896 0.935 31259 1.000 sd_R\[4\] 0.902 0.000 0.010 0.883 0.921 33600 1.000 sd_R\[5\] 0.891 0.000 0.010 0.872 0.910 37002 1.000 sd_year_morph\[1\] 0.019 0.000 0.010 0.001 0.042 3976 1.002 sd_year_morph\[2\] 0.207 0.001 0.041 0.139 0.297 5018 1.001 sd_year_morph\[3\] 0.173 0.000 0.034 0.116 0.250 6459 1.000 sd_year_morph\[4\] 0.262 0.001 0.054 0.171 0.382 4735 1.000 sd_year_morph\[5\] 0.254 0.001 0.049 0.172 0.365 4871 1.001 sd_year_repro 0.443 0.001 0.078 0.316 0.621 4296 1.001 sd_year_surv 0.344 0.001 0.069 0.232 0.505 6477 1.000 sd_init_morph\[1\] 0.160 0.000 0.019 0.128 0.203 3337 1.000 sd_init_morph\[2\] 0.278 0.001 0.039 0.210 0.365 4960 1.001 sd_init_morph\[3\] 0.322 0.001 0.046 0.243 0.422 4875 1.000 sd_init_morph\[4\] 0.341 0.001 0.046 0.261 0.442 4573 1.000 sd_init_morph\[5\] 0.275 0.001 0.042 0.204 0.365 4956 1.001 lp\_\_ -8920.553 1.288 68.006 -9055.994 -8789.629 2786 1.002
+
+Samples were drawn using NUTS(diag_e) at Fri Feb 27 15:52:35 2026. For each parameter, n_eff is a crude measure of effective sample size, and Rhat is the potential scale reduction factor on split chains (at convergence, Rhat=1).
 :::
 
-
-
-
 By the way, it turns out we are removing approximately 61 rows (out of a total of 4424) that do not have a sex value. So the question is whether it is worth it to include them (by finding the sex from a different place)?
-
-
-
-
-
-
-
 
 ```{r}
 # ==============================================================================
@@ -730,85 +681,21 @@ stan_trace(out_lv, pars = c("beta_morph[2,3]", "beta_morph[2,4]", "beta_morph[2,
 
 ```
 
-Alright, so it might be an issue that both age and season (as fixed effects) are struggling against the latent variables for being the source of variance. In any case it seems for the most part that also in the case of the beta's not converging it's mainly chain 4's fault. 
+Alright, so it might be an issue that both age and season (as fixed effects) are struggling against the latent variables for being the source of variance. In any case it seems for the most part that also in the case of the beta's not converging it's mainly chain 4's fault.
 
 Below are the results of the full run with a bunch of both fixed and random effects and also reproduction and survival added. It failed. Notice that also some of the beta's are not converged. This could be the result of a "tug-of-war" between the fixed effects and the latent variables, for example age is a fixed effect, but that also accounts for variation in general body size, so having that independent of the LV causes the model to not understand where to put the variation, and that could lead to convergence issues.
 
+Inference for Stan model: anon_model. 4 chains, each with iter=6000; warmup=2000; thin=1; post-warmup draws per chain=4000, total post-warmup draws=16000.
 
-Inference for Stan model: anon_model.
-4 chains, each with iter=6000; warmup=2000; thin=1; 
-post-warmup draws per chain=4000, total post-warmup draws=16000.
+```         
+                  mean se_mean     sd      2.5%     97.5% n_eff  Rhat
+```
 
-                      mean se_mean     sd      2.5%     97.5% n_eff  Rhat
-beta_morph[1,1]     -0.032   0.001  0.057    -0.142     0.081  7807 1.000
-beta_morph[1,2]      0.208   0.001  0.065     0.081     0.338  4268 1.006
-beta_morph[1,3]      0.292   0.001  0.058     0.177     0.407  5281 1.003
-beta_morph[1,4]      0.347   0.003  0.077     0.197     0.498   908 1.014
-beta_morph[1,5]      0.065   0.001  0.068    -0.067     0.199  5037 1.005
-beta_morph[2,1]     -0.002   0.000  0.010    -0.022     0.017 21881 1.001
-beta_morph[2,2]     -0.828   0.000  0.026    -0.879    -0.776  6707 1.005
-beta_morph[2,3]     -0.946   0.021  0.040    -1.016    -0.863     4 1.423
-beta_morph[2,4]     -0.927   0.023  0.042    -0.997    -0.839     3 1.513
-beta_morph[2,5]     -0.304   0.013  0.036    -0.373    -0.233     8 1.142
-beta_morph[3,1]      0.040   0.000  0.012     0.017     0.063 23049 1.000
-beta_morph[3,2]     -0.011   0.000  0.033    -0.075     0.054 10614 1.004
-beta_morph[3,3]     -0.013   0.006  0.039    -0.090     0.065    46 1.028
-beta_morph[3,4]      0.261   0.006  0.038     0.187     0.337    47 1.027
-beta_morph[3,5]      0.250   0.001  0.043     0.166     0.333  1458 1.007
-beta_morph[4,1]     -0.005   0.000  0.012    -0.028     0.018 21404 1.000
-beta_morph[4,2]      0.402   0.001  0.033     0.336     0.466   571 1.011
-beta_morph[4,3]      0.107   0.015  0.044     0.021     0.193     8 1.139
-beta_morph[4,4]      0.344   0.018  0.045     0.257     0.429     7 1.186
-beta_morph[4,5]      0.321   0.009  0.045     0.232     0.409    23 1.050
-beta_repro[1]       -0.186   0.002  0.100    -0.388     0.008  3870 1.000
-beta_repro[2]       -0.411   0.000  0.048    -0.506    -0.315 27105 1.000
-beta_surv[1]         0.096   0.001  0.094    -0.087     0.283  9311 1.000
-beta_surv[2]         0.193   0.000  0.081     0.035     0.352 26845 1.000
-gamma_repro[1]       0.059   0.000  0.025     0.011     0.107 22693 1.000
-gamma_repro[2]       0.042   0.008  0.033    -0.024     0.104    18 1.063
-gamma_surv[1]        0.123   0.000  0.043     0.038     0.206 10126 1.000
-gamma_surv[2]        0.122   0.012  0.053     0.022     0.229    20 1.057
-Lambda[1,1]          0.969   0.000  0.020     0.930     1.010  3029 1.002
-Lambda[1,2]         -0.018   0.002  0.064    -0.151     0.109   874 1.002
-Lambda[2,1]          0.226   0.001  0.041     0.146     0.307  1126 1.005
-Lambda[2,2]          0.589   0.071  0.103     0.378     0.689     2 4.458
-Lambda[3,1]          0.166   0.001  0.028     0.109     0.225   747 1.007
-Lambda[3,2]          0.307   0.070  0.100     0.210     0.508     2 4.697
-Lambda[4,1]          0.121   0.001  0.031     0.058     0.187   743 1.007
-Lambda[4,2]          0.361   0.074  0.106     0.262     0.569     2 5.080
-Lambda[5,1]          0.311   0.001  0.026     0.258     0.363   983 1.005
-Lambda[5,2]          0.297   0.034  0.055     0.221     0.420     3 2.065
-sd_R[1]              0.187   0.000  0.003     0.182     0.192  9389 1.000
-sd_R[2]              0.586   0.058  0.083     0.518     0.741     2 7.307
-sd_R[3]              0.752   0.026  0.037     0.677     0.789     2 4.158
-sd_R[4]              0.726   0.032  0.046     0.635     0.771     2 5.081
-sd_R[5]              0.835   0.009  0.015     0.802     0.859     3 1.651
-sd_year_morph[1]     0.016   0.000  0.010     0.001     0.038  4992 1.000
-sd_year_morph[2]     0.128   0.001  0.035     0.072     0.207  3849 1.006
-sd_year_morph[3]     0.125   0.003  0.028     0.077     0.188    91 1.022
-sd_year_morph[4]     0.234   0.013  0.059     0.139     0.369    20 1.067
-sd_year_morph[5]     0.193   0.002  0.042     0.123     0.287   388 1.015
-sd_year_repro        0.442   0.001  0.076     0.315     0.610  5345 1.001
-sd_year_surv         0.347   0.001  0.070     0.232     0.503  7126 1.000
-sd_init_morph[1]     0.156   0.000  0.019     0.124     0.198  4464 1.000
-sd_init_morph[2]     0.265   0.001  0.035     0.206     0.343  2671 1.008
-sd_init_morph[3]     0.278   0.001  0.039     0.211     0.363  1323 1.011
-sd_init_morph[4]     0.318   0.001  0.041     0.247     0.409  5754 1.001
-sd_init_morph[5]     0.268   0.001  0.043     0.193     0.361  5383 1.005
-h2_lv[1]             0.471   0.001  0.046     0.381     0.560  1989 1.001
-h2_lv[2]             0.542   0.016  0.065     0.415     0.670    16 1.093
-rho                  0.158   0.030  0.113     0.031     0.456    14 1.084
-lp__             -7583.915   1.492 91.523 -7765.291 -7409.708  3762 1.003
+beta_morph\[1,1\] -0.032 0.001 0.057 -0.142 0.081 7807 1.000 beta_morph\[1,2\] 0.208 0.001 0.065 0.081 0.338 4268 1.006 beta_morph\[1,3\] 0.292 0.001 0.058 0.177 0.407 5281 1.003 beta_morph\[1,4\] 0.347 0.003 0.077 0.197 0.498 908 1.014 beta_morph\[1,5\] 0.065 0.001 0.068 -0.067 0.199 5037 1.005 beta_morph\[2,1\] -0.002 0.000 0.010 -0.022 0.017 21881 1.001 beta_morph\[2,2\] -0.828 0.000 0.026 -0.879 -0.776 6707 1.005 beta_morph\[2,3\] -0.946 0.021 0.040 -1.016 -0.863 4 1.423 beta_morph\[2,4\] -0.927 0.023 0.042 -0.997 -0.839 3 1.513 beta_morph\[2,5\] -0.304 0.013 0.036 -0.373 -0.233 8 1.142 beta_morph\[3,1\] 0.040 0.000 0.012 0.017 0.063 23049 1.000 beta_morph\[3,2\] -0.011 0.000 0.033 -0.075 0.054 10614 1.004 beta_morph\[3,3\] -0.013 0.006 0.039 -0.090 0.065 46 1.028 beta_morph\[3,4\] 0.261 0.006 0.038 0.187 0.337 47 1.027 beta_morph\[3,5\] 0.250 0.001 0.043 0.166 0.333 1458 1.007 beta_morph\[4,1\] -0.005 0.000 0.012 -0.028 0.018 21404 1.000 beta_morph\[4,2\] 0.402 0.001 0.033 0.336 0.466 571 1.011 beta_morph\[4,3\] 0.107 0.015 0.044 0.021 0.193 8 1.139 beta_morph\[4,4\] 0.344 0.018 0.045 0.257 0.429 7 1.186 beta_morph\[4,5\] 0.321 0.009 0.045 0.232 0.409 23 1.050 beta_repro\[1\] -0.186 0.002 0.100 -0.388 0.008 3870 1.000 beta_repro\[2\] -0.411 0.000 0.048 -0.506 -0.315 27105 1.000 beta_surv\[1\] 0.096 0.001 0.094 -0.087 0.283 9311 1.000 beta_surv\[2\] 0.193 0.000 0.081 0.035 0.352 26845 1.000 gamma_repro\[1\] 0.059 0.000 0.025 0.011 0.107 22693 1.000 gamma_repro\[2\] 0.042 0.008 0.033 -0.024 0.104 18 1.063 gamma_surv\[1\] 0.123 0.000 0.043 0.038 0.206 10126 1.000 gamma_surv\[2\] 0.122 0.012 0.053 0.022 0.229 20 1.057 Lambda\[1,1\] 0.969 0.000 0.020 0.930 1.010 3029 1.002 Lambda\[1,2\] -0.018 0.002 0.064 -0.151 0.109 874 1.002 Lambda\[2,1\] 0.226 0.001 0.041 0.146 0.307 1126 1.005 Lambda\[2,2\] 0.589 0.071 0.103 0.378 0.689 2 4.458 Lambda\[3,1\] 0.166 0.001 0.028 0.109 0.225 747 1.007 Lambda\[3,2\] 0.307 0.070 0.100 0.210 0.508 2 4.697 Lambda\[4,1\] 0.121 0.001 0.031 0.058 0.187 743 1.007 Lambda\[4,2\] 0.361 0.074 0.106 0.262 0.569 2 5.080 Lambda\[5,1\] 0.311 0.001 0.026 0.258 0.363 983 1.005 Lambda\[5,2\] 0.297 0.034 0.055 0.221 0.420 3 2.065 sd_R\[1\] 0.187 0.000 0.003 0.182 0.192 9389 1.000 sd_R\[2\] 0.586 0.058 0.083 0.518 0.741 2 7.307 sd_R\[3\] 0.752 0.026 0.037 0.677 0.789 2 4.158 sd_R\[4\] 0.726 0.032 0.046 0.635 0.771 2 5.081 sd_R\[5\] 0.835 0.009 0.015 0.802 0.859 3 1.651 sd_year_morph\[1\] 0.016 0.000 0.010 0.001 0.038 4992 1.000 sd_year_morph\[2\] 0.128 0.001 0.035 0.072 0.207 3849 1.006 sd_year_morph\[3\] 0.125 0.003 0.028 0.077 0.188 91 1.022 sd_year_morph\[4\] 0.234 0.013 0.059 0.139 0.369 20 1.067 sd_year_morph\[5\] 0.193 0.002 0.042 0.123 0.287 388 1.015 sd_year_repro 0.442 0.001 0.076 0.315 0.610 5345 1.001 sd_year_surv 0.347 0.001 0.070 0.232 0.503 7126 1.000 sd_init_morph\[1\] 0.156 0.000 0.019 0.124 0.198 4464 1.000 sd_init_morph\[2\] 0.265 0.001 0.035 0.206 0.343 2671 1.008 sd_init_morph\[3\] 0.278 0.001 0.039 0.211 0.363 1323 1.011 sd_init_morph\[4\] 0.318 0.001 0.041 0.247 0.409 5754 1.001 sd_init_morph\[5\] 0.268 0.001 0.043 0.193 0.361 5383 1.005 h2_lv\[1\] 0.471 0.001 0.046 0.381 0.560 1989 1.001 h2_lv\[2\] 0.542 0.016 0.065 0.415 0.670 16 1.093 rho 0.158 0.030 0.113 0.031 0.456 14 1.084 lp\_\_ -7583.915 1.492 91.523 -7765.291 -7409.708 3762 1.003
 
-Samples were drawn using NUTS(diag_e) at Thu Mar  5 05:51:39 2026.
-For each parameter, n_eff is a crude measure of effective sample size,
-and Rhat is the potential scale reduction factor on split chains (at 
-convergence, Rhat=1).
+Samples were drawn using NUTS(diag_e) at Thu Mar 5 05:51:39 2026. For each parameter, n_eff is a crude measure of effective sample size, and Rhat is the potential scale reduction factor on split chains (at convergence, Rhat=1).
 
-
-
-Now testing what happens if I remove the one chain that disagreed a lot with the others, chain 4. 
-But that isn't really good practice to remove one chain after the fact, but yeah: 
+Now testing what happens if I remove the one chain that disagreed a lot with the others, chain 4. But that isn't really good practice to remove one chain after the fact, but yeah:
 
 ```{r}
 library(rstan)
@@ -843,44 +730,13 @@ post_array <- as.array(out_lv)
  print(new_summary_df[pars_to_check, ])
 ```
 
+```         
+                  mean      se_mean         sd         2.5%         25%         50%        75%
+```
 
-                      mean      se_mean         sd         2.5%         25%         50%        75%
-gamma_repro[1]  0.05876032 0.0002661359 0.02524820  0.009481862  0.04175122  0.05915998 0.07640587
-gamma_repro[2]  0.04777510 0.0003172129 0.02986328 -0.010871722  0.02730378  0.04818482 0.06733020
-gamma_surv[1]   0.12208226 0.0004901230 0.04279028  0.037763686  0.09338545  0.12184798 0.15100881
-gamma_surv[2]   0.11208502 0.0005623019 0.04955137  0.014866939  0.07866373  0.11199741 0.14616805
-Lambda[1,1]     0.96976553 0.0005421117 0.02003019  0.931859582  0.95627350  0.96941554 0.98287756
-Lambda[1,2]    -0.01921731 0.0023323181 0.05477292 -0.142738853 -0.04933346 -0.01567230 0.01635498
-Lambda[2,1]     0.22380085 0.0016100168 0.03987824  0.149546045  0.19797763  0.22217643 0.24814697
-Lambda[2,2]     0.64693420 0.0007073727 0.02299174  0.600572777  0.63206784  0.64742157 0.66219629
-rho             0.13362541 0.0023481142 0.09816247  0.027553851  0.06450410  0.10327557 0.17425838
-h2_lv[2]        0.55484251 0.0023513491 0.06180481  0.434449028  0.51157360  0.55515390 0.59773809
-                    97.5% n_eff      Rhat valid            Q5         Q50        Q95    MCSE_Q2.5
-gamma_repro[1] 0.10700486  8802 1.0004085     1  0.0163985275  0.05915998 0.09930538 0.0009446112
-gamma_repro[2] 0.10743334  8826 1.0002299     1 -0.0009635907  0.04818482 0.09638510 0.0010513245
-gamma_surv[1]  0.20544156  7597 1.0002403     1  0.0525235148  0.12184798 0.19318054 0.0017109337
-gamma_surv[2]  0.20727535  7694 0.9998258     1  0.0305582623  0.11199741 0.19381430 0.0023681569
-Lambda[1,1]    1.01051147  1352 1.0011862     1  0.9374574698  0.96941554 1.00355302 0.0009286183
-Lambda[1,2]    0.07991625   550 1.0040894     1 -0.1159916319 -0.01567230 0.06274527 0.0065584238
-Lambda[2,1]    0.30945131   612 1.0029961     1  0.1610302094  0.22217643 0.29281746 0.0025564566
-Lambda[2,2]    0.69168214  1046 1.0016785     1  0.6091233641  0.64742157 0.68412126 0.0020906611
-rho            0.40826256  1734 1.0013450     1  0.0337616989  0.10327557 0.34081387 0.0010535992
-h2_lv[2]       0.67290882   682 1.0017496     1  0.4520669502  0.55515390 0.65596094 0.0028583820
-                   MCSE_Q25     MCSE_Q50     MCSE_Q75   MCSE_Q97.5      MCSE_SD Bulk_ESS Tail_ESS
-gamma_repro[1] 0.0004963538 0.0004024525 0.0004945841 0.0009398345 0.0002032631     8982     4495
-gamma_repro[2] 0.0005834702 0.0003947184 0.0005480688 0.0014949426 0.0002697446     8902     4460
-gamma_surv[1]  0.0009158824 0.0005036031 0.0007810828 0.0013057482 0.0003705827     7607     4188
-gamma_surv[2]  0.0008147991 0.0007712307 0.0010868857 0.0016850624 0.0004293244     7771     4687
-Lambda[1,1]    0.0005748420 0.0005895095 0.0005358934 0.0011162593 0.0003834128     1365     3118
-Lambda[1,2]    0.0026418117 0.0018097028 0.0018903110 0.0045931769 0.0016500709      575      739
-Lambda[2,1]    0.0014175238 0.0013694119 0.0018220951 0.0048068249 0.0011508057      627      915
-Lambda[2,2]    0.0008354725 0.0007201968 0.0007976987 0.0011090193 0.0005003262     1065     1768
-rho            0.0013674191 0.0019084002 0.0035337562 0.0085709880 0.0016606446     1616     2778
-h2_lv[2]       0.0029986225 0.0024574171 0.0029831721 0.0033503018 0.0016671106      692     1601
-
+gamma_repro\[1\] 0.05876032 0.0002661359 0.02524820 0.009481862 0.04175122 0.05915998 0.07640587 gamma_repro\[2\] 0.04777510 0.0003172129 0.02986328 -0.010871722 0.02730378 0.04818482 0.06733020 gamma_surv\[1\] 0.12208226 0.0004901230 0.04279028 0.037763686 0.09338545 0.12184798 0.15100881 gamma_surv\[2\] 0.11208502 0.0005623019 0.04955137 0.014866939 0.07866373 0.11199741 0.14616805 Lambda\[1,1\] 0.96976553 0.0005421117 0.02003019 0.931859582 0.95627350 0.96941554 0.98287756 Lambda\[1,2\] -0.01921731 0.0023323181 0.05477292 -0.142738853 -0.04933346 -0.01567230 0.01635498 Lambda\[2,1\] 0.22380085 0.0016100168 0.03987824 0.149546045 0.19797763 0.22217643 0.24814697 Lambda\[2,2\] 0.64693420 0.0007073727 0.02299174 0.600572777 0.63206784 0.64742157 0.66219629 rho 0.13362541 0.0023481142 0.09816247 0.027553851 0.06450410 0.10327557 0.17425838 h2_lv\[2\] 0.55484251 0.0023513491 0.06180481 0.434449028 0.51157360 0.55515390 0.59773809 97.5% n_eff Rhat valid Q5 Q50 Q95 MCSE_Q2.5 gamma_repro\[1\] 0.10700486 8802 1.0004085 1 0.0163985275 0.05915998 0.09930538 0.0009446112 gamma_repro\[2\] 0.10743334 8826 1.0002299 1 -0.0009635907 0.04818482 0.09638510 0.0010513245 gamma_surv\[1\] 0.20544156 7597 1.0002403 1 0.0525235148 0.12184798 0.19318054 0.0017109337 gamma_surv\[2\] 0.20727535 7694 0.9998258 1 0.0305582623 0.11199741 0.19381430 0.0023681569 Lambda\[1,1\] 1.01051147 1352 1.0011862 1 0.9374574698 0.96941554 1.00355302 0.0009286183 Lambda\[1,2\] 0.07991625 550 1.0040894 1 -0.1159916319 -0.01567230 0.06274527 0.0065584238 Lambda\[2,1\] 0.30945131 612 1.0029961 1 0.1610302094 0.22217643 0.29281746 0.0025564566 Lambda\[2,2\] 0.69168214 1046 1.0016785 1 0.6091233641 0.64742157 0.68412126 0.0020906611 rho 0.40826256 1734 1.0013450 1 0.0337616989 0.10327557 0.34081387 0.0010535992 h2_lv\[2\] 0.67290882 682 1.0017496 1 0.4520669502 0.55515390 0.65596094 0.0028583820 MCSE_Q25 MCSE_Q50 MCSE_Q75 MCSE_Q97.5 MCSE_SD Bulk_ESS Tail_ESS gamma_repro\[1\] 0.0004963538 0.0004024525 0.0004945841 0.0009398345 0.0002032631 8982 4495 gamma_repro\[2\] 0.0005834702 0.0003947184 0.0005480688 0.0014949426 0.0002697446 8902 4460 gamma_surv\[1\] 0.0009158824 0.0005036031 0.0007810828 0.0013057482 0.0003705827 7607 4188 gamma_surv\[2\] 0.0008147991 0.0007712307 0.0010868857 0.0016850624 0.0004293244 7771 4687 Lambda\[1,1\] 0.0005748420 0.0005895095 0.0005358934 0.0011162593 0.0003834128 1365 3118 Lambda\[1,2\] 0.0026418117 0.0018097028 0.0018903110 0.0045931769 0.0016500709 575 739 Lambda\[2,1\] 0.0014175238 0.0013694119 0.0018220951 0.0048068249 0.0011508057 627 915 Lambda\[2,2\] 0.0008354725 0.0007201968 0.0007976987 0.0011090193 0.0005003262 1065 1768 rho 0.0013674191 0.0019084002 0.0035337562 0.0085709880 0.0016606446 1616 2778 h2_lv\[2\] 0.0029986225 0.0024574171 0.0029831721 0.0033503018 0.0016671106 692 1601
 
 So much better results here. But should probably check the log posterior of the different chains. And can't just remove a chain I don't like.
-
 
 ```{r}
 # 1. Extract the 3D array from your Stan fit
@@ -903,10 +759,11 @@ cat("\n--- rho Summary Per Chain ---\n")
 rho_summary <- apply(post_array[, , "rho"], MARGIN = 2, FUN = summarize_chain)
 print(round(rho_summary, 3))
 ```
-Clearly significantly lower for the 4th chain on the lp, suggesting it has reached a local minimum. 
 
+Clearly significantly lower for the 4th chain on the lp, suggesting it has reached a local minimum.
 
-Below is code to show density for rho for the different chains, along with some more diagnostic plots of the log posterior. 
+Below is code to show density for rho for the different chains, along with some more diagnostic plots of the log posterior.
+
 ```{r}
 
 # Load the required libraries
@@ -955,9 +812,7 @@ mcmc_scatter(posterior_array, pars = c("rho", "lp__")) +
   theme_minimal()
 ```
 
-
-
-Now I'll check the results for the first model that didn't work for 2 latent variables on both morphology and fitness. This is from the R script combined_test_model.R (or that script might actually contain the 1 lv version which i did afterwards...). What I need to check is the chains and also the rho densities and also the log posteriors, and maybe more. 
+Now I'll check the results for the first model that didn't work for 2 latent variables on both morphology and fitness. This is from the R script combined_test_model.R (or that script might actually contain the 1 lv version which i did afterwards...). What I need to check is the chains and also the rho densities and also the log posteriors, and maybe more.
 
 ```{r}
 out_old <- readRDS('output_markov/Output_Joint_Starter.rds')
@@ -977,8 +832,6 @@ print(out_old,
       probs = c(0.025, 0.975),
       digits_summary = 3)
 ```
-
-
 
 ```{r}
 library(bayesplot)
@@ -1005,6 +858,7 @@ print(p2)
 print(p3)
 print(p4)
 ```
+
 ```{r}
 
 # Load the required libraries
@@ -1073,10 +927,10 @@ rho_summary <- apply(posterior_array[, , "rho"], MARGIN = 2, FUN = summarize_cha
 print(round(rho_summary, 3))
 
 ```
-So, it looks like, contrary to the latest run, this older run actually had two equally good modes, as you can see that the posterior mean for the lp for chain 1 (doing its own thing) is almost exactly the same as the others. 
 
+So, it looks like, contrary to the latest run, this older run actually had two equally good modes, as you can see that the posterior mean for the lp for chain 1 (doing its own thing) is almost exactly the same as the others.
 
-Now I'll run the 2 LV model with survival and reproduction but without any fixed effects, just measurer initials random effect and year random effect. 
+Now I'll run the 2 LV model with survival and reproduction but without any fixed effects, just measurer initials random effect and year random effect.
 
 ```{stan}
 data {
@@ -1251,12 +1105,14 @@ model {
 }
 ```
 
-Here are the results from this latest run. This is a run where I put a beta(1,2) prior on rho. And I didn't include that many fixed effects (or really any). The script is the one called something with "hopefully". 
+Here are the results from this latest run. This is a run where I put a beta(1,2) prior on rho. And I didn't include that many fixed effects (or really any). The script is the one called something with "hopefully".
+
 ```{r}
 out_hopeful <- readRDS("output_markov/Output_hopefully.rds")
 print(out_hopeful, probs = c(0.025, 0.975), digits_summary = 3)
-``` 
-Now, this looks like some issues with mixing again, so we need to investigate. It seems the betas and the residuals are looking fine though, the and rho is also looking okay, so it might just be a case of sign flipping (although that shouldn't be possible anymore). So we need to look at the chains. 
+```
+
+Now, this looks like some issues with mixing again, so we need to investigate. It seems the betas and the residuals are looking fine though, the and rho is also looking okay, so it might just be a case of sign flipping (although that shouldn't be possible anymore). So we need to look at the chains.
 
 ```{r}
 library(bayesplot)
@@ -1278,9 +1134,9 @@ print(chains4)
 
 ```
 
-Alright, it looks like there are two possible modes that have multiple chains each. So we need to check some densities and log posteriors. 
+Alright, it looks like there are two possible modes that have multiple chains each. So we need to check some densities and log posteriors.
 
-```{r}  
+```{r}
 posterior_array_2 <- as.array(out_hopeful)
 
 mcmc_dens_overlay(posterior_array_2, pars = c("rho")) +
@@ -1297,7 +1153,7 @@ mcmc_dens_overlay(posterior_array_2, pars = "lp__") +
   theme_minimal()
 ```
 
-Okay, so the log posteriors seem to be slightly different for the two modes. 
+Okay, so the log posteriors seem to be slightly different for the two modes.
 
 ```{r}
 summarize_chain <- function(x) {
@@ -1317,18 +1173,17 @@ rho_summary <- apply(posterior_array_2[, , "rho"], MARGIN = 2, FUN = summarize_c
 print(round(rho_summary, 3))
 ```
 
-It seems the mode with rho around 0.28 has somewhat higher log posteriors, by approximately 5 log units, compared to the mode with rho around 0.34-0.35, and 5 log units is a significant difference. But the differences within each mode is also quite large, so the 5 log unit difference is quite fuzzy. 
+It seems the mode with rho around 0.28 has somewhat higher log posteriors, by approximately 5 log units, compared to the mode with rho around 0.34-0.35, and 5 log units is a significant difference. But the differences within each mode is also quite large, so the 5 log unit difference is quite fuzzy.
 
 Now, one question is, can I just take the log posterior and say that, hey, this mode has a significantly higher log posterior, so this is the better mode, and then ignore the other one? If not, how do I prevent this duality in the run? Should I just tweak the priors even more or the initialization to avoid the model from going into the "bad" mode?
 
-But in any case, it seems the model finds evidence for a second latent variable for these data, although that isn't exactly shown without a regularization or something, I suppose. 
+But in any case, it seems the model finds evidence for a second latent variable for these data, although that isn't exactly shown without a regularization or something, I suppose.
 
 What is interesting is that even though the model seems to respect the rho, the loadings seem to be about the same magnitude in both modes. If the hypothesis that the body size is the latent variable representing the most variance, it would not make sense that the rho would be only about 0.3 if the first LV represents shape in one of the modes. Then the rho would have to be like 3 or something. One possibility is that it is the lambda_raw that gets blown up, to accommodate the requirement for both rho and the actual loadings. But the lambda_raw has a standard normal prior (I think), this might need to be tightened, or I'm not exactly sure what can be done except constraining some loadings.
 
-Alright, one possibility is to constrain the priors of the loadings for the second latent variable to have a lower standard deviation, and forget about rho (or estimate it after the fact could be done probably).  Another option could potentially be to constrain lambda_raw (or equivalent) to only be sampled within a smaller interval of say -1.5 to 1.5. 
+Alright, one possibility is to constrain the priors of the loadings for the second latent variable to have a lower standard deviation, and forget about rho (or estimate it after the fact could be done probably). Another option could potentially be to constrain lambda_raw (or equivalent) to only be sampled within a smaller interval of say -1.5 to 1.5.
 
 By the way, I think it actually was the model with the body size as the second latent variable that had the highest log posterior in the latest run, but need to doublecheck this.
-
 
 *Run with just stricter priors on the second factor*
 
@@ -1482,9 +1337,7 @@ model {
 }
 ```
 
-
-Alright, now I ran a model without rho (just computing it after the fact as a generated quantity), and just using much narrower priors on the loadings of the second latent variable. 
-
+Alright, now I ran a model without rho (just computing it after the fact as a generated quantity), and just using much narrower priors on the loadings of the second latent variable.
 
 ```{r}
 out_just_prior <- readRDS("output_markov/Output_hopefully_no_rho.rds")
@@ -1492,18 +1345,15 @@ out_just_prior <- readRDS("output_markov/Output_hopefully_no_rho.rds")
 print(out_just_prior, probs = c(0.025, 0.975), digits_summary = 3)
 ```
 
-However, I had constrained the loadings lambda_1_1 and lambda_2_2 to be positive, which caused the model to be forced to have the second factor be the body size factor, and inflated the rho to around 1.9 even though I had a normal(0, 0.2) prior on the loadings of the second factor and a standard normal on the loadings of the first factor, causing the model to be forced to fight the prior. So it seems the best way after all is to just fix any sign flipping after the run, and not constrain any loadings to be positive (or zero). 
+However, I had constrained the loadings lambda_1_1 and lambda_2_2 to be positive, which caused the model to be forced to have the second factor be the body size factor, and inflated the rho to around 1.9 even though I had a normal(0, 0.2) prior on the loadings of the second factor and a standard normal on the loadings of the first factor, causing the model to be forced to fight the prior. So it seems the best way after all is to just fix any sign flipping after the run, and not constrain any loadings to be positive (or zero).
 
-Now, the results show that the factor that was the shape factor actually had a positive correlation with the wing and negative with the others, suggesting a different shape factor than the ones previously found (I think). Whether this means that there are grounds for a third latent variable or whether this was a result of the weird model fitting caused by the positive constraint is not clear to me, but it seems it is a valid factor in any case. It could also suggest that the ground for a single shape factor is weak, and when forced to find a single shape factor, the model jumps between different possibilities. 
+Now, the results show that the factor that was the shape factor actually had a positive correlation with the wing and negative with the others, suggesting a different shape factor than the ones previously found (I think). Whether this means that there are grounds for a third latent variable or whether this was a result of the weird model fitting caused by the positive constraint is not clear to me, but it seems it is a valid factor in any case. It could also suggest that the ground for a single shape factor is weak, and when forced to find a single shape factor, the model jumps between different possibilities.
 
-The next step then, is to run the model without any positive constraints, but I'll ask Bob first. 
+The next step then, is to run the model without any positive constraints, but I'll ask Bob first.
 
-When it comes to why the model with the rho using a beta prior had difficulties settling between the two modes, I think the best explanation is that it could just inflate the lambda_raw, to accommodate the requirement for both rho and the actual loadings, and that the model had difficulties finding a good balance between these two, which is why it had difficulties settling on one mode. 
+When it comes to why the model with the rho using a beta prior had difficulties settling between the two modes, I think the best explanation is that it could just inflate the lambda_raw, to accommodate the requirement for both rho and the actual loadings, and that the model had difficulties finding a good balance between these two, which is why it had difficulties settling on one mode.
 
-
-Okay, now I will change it so that I don't have the positive constraints on any lambdas. 
-
-
+Okay, now I will change it so that I don't have the positive constraints on any lambdas.
 
 Alright, now here are the results of the run without any positive constraints.
 
@@ -1543,9 +1393,10 @@ print(chains3)
 print(chains4)
 
 ```
+
 So it is clear from these results that the second latent variable is sign flipped between the chains. Now, I will correct the chains that are flipped for the second variable. The flipped chain are 2 and 4 vs 1 and 3. So I will flip the sign of the second latent variable for chains 2 and 4, and then combine the chains and check the results.
 
-And as can be seen from the log posteriors, the chains all have around the same value, so it doesn't seem like there are multiple different universes that are being explored. 
+And as can be seen from the log posteriors, the chains all have around the same value, so it doesn't seem like there are multiple different universes that are being explored.
 
 ```{r}
 
@@ -1586,7 +1437,6 @@ params_to_check <- c("Lambda[1,2]", "Lambda[2,2]", "Lambda[3,2]",
 
 ```
 
-
 ```{r}
 library(posterior)
 
@@ -1608,7 +1458,6 @@ subset_summary <- summary_df[summary_df$variable %in% params_to_check, ]
 print(subset_summary)
 ```
 
-
 ```{r}
 library(bayesplot)
 library(ggplot2)
@@ -1627,7 +1476,7 @@ plot_flipped_chains <- mcmc_trace(posterior_array_no_pos, pars = worst_vars) +
 print(plot_flipped_chains)
 ```
 
-It looks like we're getting slow mixing and high autocorrelation. It doesn't seem like any of the chains are living in an entirely different universe from the others, as the chains are overlapping (no clear gap between them). We are getting R hats as high as 1.15, and n effs as low as 27, so it's not ideal. But running for more iterations could potentially help. 
+It looks like we're getting slow mixing and high autocorrelation. It doesn't seem like any of the chains are living in an entirely different universe from the others, as the chains are overlapping (no clear gap between them). We are getting R hats as high as 1.15, and n effs as low as 27, so it's not ideal. But running for more iterations could potentially help.
 
 Here is a function to hopefully do the post-run sign flipping automatically for the chains that are flipped:
 
@@ -1667,3 +1516,193 @@ auto_align_signs <- function(stan_array, factor_num, anchor_trait, n_traits = 5)
   return(stan_array)
 }
 ```
+
+
+
+Now it's time to look at the most recent results, in which we ran for 20,000 total iterations in order to check if that helps the convergence. 
+
+```{r}
+out_long <- readRDS("output_markov/Output_hopefully_no_pos_long.rds")
+print(out_long, probs = c(0.025, 0.975), digits_summary = 3)
+```
+
+Alright, we have high rhat's as usual, now let's take a look at the chains.
+
+```{r}
+library(bayesplot)
+library(ggplot2)
+color_scheme_set("mix-blue-red")
+chains1_long <- mcmc_trace(out_long, pars = c("Lambda[1,1]", "Lambda[1,2]", "Lambda[3,1]", "Lambda[3,2]"))
+chains2_long <- mcmc_trace(out_long, pars = c("gamma_repro[1]", "gamma_repro[2]", "gamma_surv[1]", "gamma_surv[2]", "rho"))
+chains3_long <- mcmc_trace(out_long, pars = c("Lambda[2,1]", "Lambda[2,2]", "Lambda[4,1]", "Lambda[4,2]", "Lambda[5,1]", "Lambda[5,2]"))
+chains4_long <- mcmc_trace(out_long, pars= c("lp__", "h2_lv[1]", "h2_lv[2]"))
+print(chains1_long)
+print(chains2_long)
+print(chains3_long)
+print(chains4_long)
+```
+
+It looks mostly good, but there is some sign flipping. But what is interesting is that chain 4 took a lot longer than the 3 others, but it looks like it's doing mostly the same thing as the others, although the gammas on the second latent variable might be acting differently for chain 4, but it's kind of hard to tell. In any case, let's check the sign flipped version.
+
+```{r}
+
+library(posterior)
+
+# 1. Convert the raw Stan output to a 3D array (iterations x chains x parameters)
+raw_array <- as.array(out_long)
+
+# 2. Align Factor 1 (The "Size/Shape" Factor)
+# We use Trait 1 (Wing Length) as the anchor. If a chain made Wing Length negative, 
+# this flips that entire chain for Factor 1.
+aligned_array <- auto_align_signs(stan_array = raw_array, 
+                                  factor_num = 1, 
+                                  anchor_trait = 1, 
+                                  n_traits = 5)
+
+# 3. Align Factor 2 (The second Factor)
+# We use Trait 2 (Tarsus) as the anchor here, since Wing Length might have 
+# a negative or near-zero loading on the shape factor depending on the rotation.
+aligned_array <- auto_align_signs(stan_array = aligned_array, 
+                                  factor_num = 2, 
+                                  anchor_trait = 2, 
+                                  n_traits = 5)
+
+# 4. Convert the aligned array into a clean 'posterior' draws object
+clean_draws <- as_draws_array(aligned_array)
+
+# 5. Generate the summary table (forcing it to a standard data frame to avoid R errors)
+summary_df <- as.data.frame(summarise_draws(clean_draws))
+
+# 6. Print the critical parameters to verify convergence
+params_to_check <- c("Lambda[1,1]", "Lambda[1,2]", "Lambda[2,2]", "Lambda[3,2]", "Lambda[4,2]", "Lambda[5,2]", "Lambda[2,1]", "Lambda[3,1]", "Lambda[4,1]", "Lambda[5,1]",
+                     "gamma_repro[1]", "gamma_repro[2]", 
+                     "gamma_surv[1]", "gamma_surv[2]", "rho", "lp__", "h2_lv[1]", "h2_lv[2]", 
+                     "sd_R[1]", "sd_R[2]", "sd_R[3]", "sd_R[4]", "sd_R[5]")
+
+print(summary_df[summary_df$variable %in% params_to_check, 
+                 c("variable", "mean", "rhat", "ess_bulk")])
+``` 
+
+
+```{r}
+library(bayesplot)
+library(posterior)
+library(ggplot2)
+
+# Assuming 'clean_draws' is your aligned array from the previous step
+color_scheme_set("mix-blue-red")
+
+# 1. Traceplots to visually confirm the alignment worked perfectly
+pars_to_plot <- c("Lambda[1,2]", "Lambda[2,2]", "gamma_surv[1]", "gamma_surv[2]")
+p_traces <- mcmc_trace(clean_draws, pars = pars_to_plot) +
+  ggtitle("Perfectly Aligned Traceplots (Post-HPC)") +
+  theme_minimal()
+print(p_traces)
+
+# 2. Extract specific Credible Intervals (2.5% and 97.5%)
+# We define a custom function for summarise_draws to get the exact quantiles
+summary_ci <- summarise_draws(
+  clean_draws, 
+  "mean", 
+  ~quantile(.x, probs = c(0.025, 0.975)),
+  "rhat", 
+  "ess_bulk"
+)
+
+```
+
+```{r}
+# Turn off scientific notation globally
+options(scipen = 999)
+
+# Convert to data frame to prevent printing errors
+summary_ci_df <- as.data.frame(summary_ci)
+
+# Filter to your key parameters
+params_to_check <- c(
+  "Lambda[1,1]", "Lambda[1,2]", "Lambda[2,2]", "Lambda[3,2]", "Lambda[4,2]", "Lambda[5,2]", "Lambda[2,1]", "Lambda[3,1]", "Lambda[4,1]", "Lambda[5,1]",
+                     "gamma_repro[1]", "gamma_repro[2]", 
+                     "gamma_surv[1]", "gamma_surv[2]", "rho", "lp__", "h2_lv[1]", "h2_lv[2]", 
+                     "sd_R[1]", "sd_R[2]", "sd_R[3]", "sd_R[4]", "sd_R[5]"
+)
+
+subset_ci <- summary_ci_df[summary_ci_df$variable %in% params_to_check, ]
+
+# Find all numeric columns and round them to 3 decimal places
+is_num <- sapply(subset_ci, is.numeric)
+subset_ci[is_num] <- lapply(subset_ci[is_num], round, 3)
+
+# Print the final, publication-ready table
+print(subset_ci, row.names = FALSE)
+```
+
+
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# 1. Filter the 'subset_ci' dataframe for just the selection gradients
+gamma_df <- subset_ci %>%
+  filter(grepl("^gamma", variable)) %>%
+  mutate(
+    # Create clean, readable labels for the y-axis
+    Trait = case_when(
+      variable == "gamma_surv[1]" ~ "Survival: Factor 1 (Size)",
+      variable == "gamma_surv[2]" ~ "Survival: Factor 2 (Shape)",
+      variable == "gamma_repro[1]" ~ "Reproduction: Factor 1 (Size)",
+      variable == "gamma_repro[2]" ~ "Reproduction: Factor 2 (Shape)"
+    ),
+    # Create a grouping variable so we can color-code Survival vs Reproduction
+    Fitness_Type = ifelse(grepl("surv", variable), "Survival", "Reproduction")
+  )
+
+# 2. Build the ggplot
+forest_plot <- ggplot(gamma_df, aes(x = mean, y = Trait, color = Fitness_Type)) +
+  # Draw the critical 'Zero' line first so it sits behind the data
+  geom_vline(xintercept = 0, linetype = "dashed", color = "darkgray", linewidth = 1) +
+  
+  # Draw the 95% Credible Intervals using backticks for the percentage column names
+  geom_errorbarh(aes(xmin = `2.5%`, xmax = `97.5%`), height = 0.2, linewidth = 1.2) +
+  
+  # Draw the Mean estimates (the dots)
+  geom_point(size = 4) +
+  
+  # Custom colors (Colorblind-friendly blue and orange)
+  scale_color_manual(values = c("Survival" = "#0072B2", "Reproduction" = "#D55E00")) +
+  
+  # Clean up the labels
+  labs(
+    title = "Selection on Latent Size and Shape",
+    x = "Selection Gradient (Estimate \u00B1 95% CI)",
+    y = NULL
+  ) +
+  
+  # Apply a clean, minimalist theme suitable for a thesis
+  theme_minimal(base_size = 14) +
+  theme(
+    legend.position = "none", # Hide legend since the y-axis labels explain it
+    panel.grid.minor = element_blank(),
+    axis.text.y = element_text(face = "bold", color = "black"),
+    axis.text.x = element_text(color = "black")
+  )
+
+# Print the plot!
+print(forest_plot)
+```
+
+
+
+
+
+Notes for meeting on 19 March: 
+
+From last time: There are two types of regularization that are relevant, one for the fixed effects (or other effects) and one for the number of latent variables themselves (which is essentially the shrinkage prior/infinite prior model).
+
+Questions: 
+1. Should I add more effects/tweak the effects more first or should I add infinite priors first? 
+2. Should I write what I have now first as a section or should the infinite prior model be part of that? Shouldn't we generate more traits before adding the infinite prior model? 
+
+
+
+
+
