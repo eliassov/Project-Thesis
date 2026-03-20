@@ -1,0 +1,26 @@
+project:
+  type: book
+
+book:
+  title: "Latent Variable Animal Model"
+  author: "Elias Ovesen"
+  date: "2026"
+  chapters:
+    - index.qmd
+    - chapters/01-intro.qmd
+    - chapters/02-methods.qmd
+    - chapters/03-results.qmd
+
+bibliography: references.bib
+
+format:
+  pdf:
+    documentclass: report
+    number-sections: true
+    toc: true
+    # This keeps the .tex file if you want to use Overleaf later
+    keep-tex: true 
+    fig-pos: "H" # Forces figures to stay where you put them
+
+
+

@@ -2,6 +2,11 @@
 .Rhistory
 .RData
 .Ruserdata
-lv_corr_resid.stan
+output_archive
+morphology.txt
+pedigree_data.txt
+Fitness.csv
 
 
+/.quarto/
+**/*.quarto_ipynb
