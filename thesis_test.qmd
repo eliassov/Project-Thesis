@@ -1863,3 +1863,13 @@ Notes for meeting on 19 March:
 From last time: There are two types of regularization that are relevant, one for the fixed effects (or other effects) and one for the number of latent variables themselves (which is essentially the shrinkage prior/infinite prior model).
 
 Questions: 1. Should I add more effects/tweak the effects more first or should I add infinite priors first? 2. Should I write what I have now first as a section or should the infinite prior model be part of that? Shouldn't we generate more traits before adding the infinite prior model?
+
+
+
+
+
+"While the MGP prior was originally designed to exploit conjugacy in Gibbs sampling, we implemented the shrinkage structure in Hamiltonian Monte Carlo (Stan), allowing us to replace the problematic Inverse-Gamma priors on residual variances with weakly informative Half-Normal priors, as recommended by Gelman (2006)." 
+
+Also, we keep Gamma priors on the shrinkage parameters, because that is mathematically aligned with the paper and handles the columns for factor analysis (for the lambda matrix) perfectly. We could maybe have used a more HMC/Stan specific framework like horseshoe priors, but that is not designed for this. So at least we will start with this (may look into this further in the future). 
+
+Look into: we get a student t distribution for the Lambda?
