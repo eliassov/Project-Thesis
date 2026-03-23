@@ -1,0 +1,11 @@
+---
+title: "Shrink Prior"
+author: "Elias Ovesen"
+editor: visual
+---
+
+Now, I'm running the model with the shrinkage prior (gamma priors). The Stan script used is the one called "gamma_shrink.stan", and the R script I used was the one called "gamma_shrink_script.R". I would ideally try to 1) send only the relevant data to the HPC (Markov), and also only put the relevant code  changes here and import the rds data set, but still not comfortable with that workflow. I have to run it on the HPC anyway, so should I run any of the model iterations/variations here, or only look at the data? I in any case should separate the code into separate modular chunks so  I don't have to prepare the data, pedigree etc. every single time. I guess the actual model code shouldn't be here, as this is where I investigate the results, and analyze and write about them and the theory around what I'm doing. 
+
+But actually developing the model also requires theory and analysis, so I should possibly add code chunks in here that represent the model iteration, that I don't run here, but might add it here just to show it, but without actually including it when rendering. 
+
+Also need to figure out how to do the framework with having different qmd files for investigating results from different models, and how that should be all incorporated into the thesis in the end. 

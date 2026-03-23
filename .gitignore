@@ -1,12 +1,23 @@
+# R History and Workspaces
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
-output_archive
-morphology.txt
-pedigree_data.txt
-Fitness.csv
 
-
+# Quarto Cache (Huge amount of hidden files)
 /.quarto/
-**/*.quarto_ipynb
+*_cache/
+*_files/
+
+# Heavy Data and Output Folders (NEVER push these to GitHub)
+*.rds
+*.Rdata
+/Data/
+/model_archive/
+/output_archive/
+/output_markov/
+/dev_archive/
+
+# OS specific files
+.DS_Store
+Thumbs.db
