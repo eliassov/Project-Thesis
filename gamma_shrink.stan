@@ -114,6 +114,7 @@ transformed parameters {
     LV[, k] = sqrt(h2_lv[k]) * G_effect[, k] + sqrt(1 - h2_lv[k]) * w_pe[k, ]';
   }
 
+  vector<lower=0>[Nlv] tau;
 
   tau[1] = delta[1];
   
@@ -125,8 +126,6 @@ transformed parameters {
   vector[Nlv] gamma_repro;
   vector[Nlv] gamma_surv;
   
-  real nu = 3; // Hyperparamter suggested by the paper
-
   for(j in 1:Nt) {
     for(h in 1:Nlv) {
       Lambda[j,h] = lambda_raw[j,h] / sqrt(phi[j,h] * tau[h]); // Implements the shrinkage on the loadings (non-centered parameterization)
