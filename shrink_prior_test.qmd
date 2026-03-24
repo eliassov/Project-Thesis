@@ -1,0 +1,61 @@
+---
+title: "Shrink Prior"
+author: "Elias Ovesen"
+editor: visual
+---
+
+Now, I'm running the model with the shrinkage prior (gamma priors). The Stan script used is the one called "gamma_shrink.stan", and the R script I used was the one called "gamma_shrink_script.R". I would ideally try to 1) send only the relevant data to the HPC (Markov), and also only put the relevant code changes here and import the rds data set, but still not comfortable with that workflow. I have to run it on the HPC anyway, so should I run any of the model iterations/variations here, or only look at the data? I in any case should separate the code into separate modular chunks so I don't have to prepare the data, pedigree etc. every single time. I guess the actual model code shouldn't be here, as this is where I investigate the results, and analyze and write about them and the theory around what I'm doing.
+
+But actually developing the model also requires theory and analysis, so I should possibly add code chunks in here that represent the model iteration, that I don't run here, but might add it here just to show it, but without actually including it when rendering.
+
+Also need to figure out how to do the framework with having different qmd files for investigating results from different models, and how that should be all incorporated into the thesis in the end.
+
+
+
+```{r}
+out_shrink <- readRDS("output_markov/Output_gamma_shrink.rds")
+```
+
+
+```{r}
+print(out_shrink, probs = c(0.025, 0.975), digits_summary = 3)
+
+
+```
+
+Okay, that's a lot of parameters, but it looks mostly fine, the tau's look good. It was only 200 total iterations though. So let's take a look at the runtimes.
+
+```{r}
+library(rstan)
+
+times <- get_elapsed_time(out_shrink)
+print(times)
+```
+
+Now, let's take a look at the plot of the chains: 
+
+```{r}
+library(bayesplot)
+library(ggplot2)
+
+color_scheme_set("mix-blue-red")
+
+chains1 <- mcmc_trace(out_shrink, pars = c("Lambda[1,1]", "Lambda[1,2]", "Lambda[3,1]", "Lambda[3,2]", "Lambda[2,3]", "Lambda[1,4]"))
+
+chains2 <- mcmc_trace(out_shrink, pars = c("tau[1]", "tau[2]", "tau[3]", "tau[4]", "gamma_repro[3]", "gamma_surv[4]"))
+
+# chains3 <- mcmc_trace(out_no_pos, pars= c("lp__", "h2_lv[1]", "h2_lv[2]"))
+
+print(chains1)
+print(chains2)
+
+```
+
+
+Okay, so it's not sign flipping we have, it's that the model has no idea what any of the parameters are. It's either label switching or the model just has no clue what it's doing. I think the paper might mention that it doesn't solve the rotational problem, only the dimension problem (need to verify this, because I thought the point of the paper was that we shouldn't enforce an echelon form of the loading matrix and thereby this was a way to avoid the rotational issue and hopefully solve it by not enforcing a structure, but allowing the model to select it and there hopfully being a single mode that the model lands on given the shrinkage of the variances), but I thought the shrinkage prior would also ensure we don't have label switching, but it might be an issue that the model simply isn't identifiable with this many latent variables as well. 
+
+So, I suspect that the fix is not as simple as adding more iterations, that would also take forever. Firstly we probably need to try with Nlv = 3 max. Then, we should probably anchor the first trait to load positively on the first factor. 
+
+
+Question: Maybe skip the local shrinkage and only have the global shrinkage, because all the phi values are around 1. And we haven't been doing that at all previously. 
+

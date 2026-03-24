@@ -291,7 +291,7 @@ dataset_joint <- list(
   No_repro = nrow(data_repro),
   No_surv  = nrow(data_surv),
   Nt = 5, 
-  Nlv = 4,
+  Nlv = 3,
   Na = Na,
   
   # Responses
@@ -349,10 +349,10 @@ init_fn_joint <- function() {
     a_1 = runif(1, 1.5, 2.5),
     a_2 = runif(1, 1.5, 2.5),
     delta = as.array(runif(dataset_joint$Nlv, 1.5, 2.5)),
-    phi   = matrix(runif(dataset_joint$Nt * dataset_joint$Nlv, 0.5, 1.5), 
-                   nrow = dataset_joint$Nt, ncol = dataset_joint$Nlv),
-    phi_r = as.array(runif(dataset_joint$Nlv, 0.5, 1.5)),
-    phi_s = as.array(runif(dataset_joint$Nlv, 0.5, 1.5)),
+    # phi   = matrix(runif(dataset_joint$Nt * dataset_joint$Nlv, 0.5, 1.5), 
+    #                nrow = dataset_joint$Nt, ncol = dataset_joint$Nlv),
+    # phi_r = as.array(runif(dataset_joint$Nlv, 0.5, 1.5)),
+    # phi_s = as.array(runif(dataset_joint$Nlv, 0.5, 1.5)),
     
     # --- Base Biology & Variances ---
     h2_lv = as.array(runif(dataset_joint$Nlv, 0.4, 0.6)),
@@ -395,7 +395,7 @@ init_fn_joint <- function() {
 
 # Run the Joint Model
 out_joint <- stan(
-  file = "gamma_shrink.stan",
+  file = "gamma_no_phi.stan",
   data = dataset_joint,
   init = init_fn_joint,        
   chains = 4, 
@@ -411,14 +411,16 @@ out_joint <- stan(
            
              "lambda_raw", "gamma_repro_raw", "gamma_surv_raw",
            
-             "a_1", "a_2", "delta", "tau", "phi", "phi_r", "phi_s", "lp__"
+             "a_1", "a_2", "delta", "tau"
+          # , "phi", "phi_r", "phi_s"
+           , "lp__"
   ),
   control = list(adapt_delta = 0.95, max_treedepth = 15), 
-  iter = 200,          
-  warmup = 100
+  iter = 250,          
+  warmup = 125
 )
 
-saveRDS(out_joint, 'Output_gamma_shrink.rds')
+saveRDS(out_joint, 'Output_gamma_shrink_no_phi.rds')
 
 
 
@@ -427,24 +429,24 @@ saveRDS(out_joint, 'Output_gamma_shrink.rds')
 # ==============================================================================
 # 6. RESULTS & DIAGNOSTICS
 # ==============================================================================
-out_lv <- readRDS('Output_gamma_shrink.rds')
+# out_lv <- readRDS('Output_gamma_shrink.rds')
 
-# Print the parameters specific to the Joint Starter model
-print(out_lv,
-      pars = c( "beta_morph", "beta_repro", "beta_surv",
-                "Lambda", "gamma_repro", "gamma_surv", 
-                "sd_R", "h2_lv",
-                
-                "sd_year_morph", "sd_year_repro", "sd_year_surv", "sd_init_morph",
-                
-                "morph_prop_var_explained", 
-                "morph_var_explained", "repro_var_explained", "surv_var_explained",
-                
-                "lambda_raw", "gamma_repro_raw", "gamma_surv_raw",
-                
-                "a_1", "a_2", "delta", "tau", "phi", "phi_r", "phi_s", "lp__"),            
-      probs = c(0.025, 0.975),
-      digits_summary = 3)
+# # Print the parameters specific to the Joint Starter model
+# print(out_lv,
+#       pars = c( "beta_morph", "beta_repro", "beta_surv",
+#                 "Lambda", "gamma_repro", "gamma_surv", 
+#                 "sd_R", "h2_lv",
+#                 
+#                 "sd_year_morph", "sd_year_repro", "sd_year_surv", "sd_init_morph",
+#                 
+#                 "morph_prop_var_explained", 
+#                 "morph_var_explained", "repro_var_explained", "surv_var_explained",
+#                 
+#                 "lambda_raw", "gamma_repro_raw", "gamma_surv_raw",
+#                 
+#                 "a_1", "a_2", "delta", "tau", "phi", "phi_r", "phi_s", "lp__"),            
+#       probs = c(0.025, 0.975),
+#       digits_summary = 3)
 
 
 
