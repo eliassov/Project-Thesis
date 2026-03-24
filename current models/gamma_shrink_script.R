@@ -341,13 +341,15 @@ init_fn_joint <- function() {
   
   list(
     # --- Raw Loadings and Gradients ---
-    lambda_raw = L_raw_init,
+    # lambda_raw = L_raw_init,
+    lambda_raw_unanchored = L_raw_init,
+    
     gamma_repro_raw = as.array(rnorm(dataset_joint$Nlv, 0, 0.1)),
     gamma_surv_raw  = as.array(rnorm(dataset_joint$Nlv, 0, 0.1)),
     
     # --- MGP Shrinkage Parameters (Must be > 0) ---
-    a_1 = runif(1, 1.5, 2.5),
-    a_2 = runif(1, 1.5, 2.5),
+    # a_1 = runif(1, 1.5, 2.5),
+    # a_2 = runif(1, 1.5, 2.5),
     delta = as.array(runif(dataset_joint$Nlv, 1.5, 2.5)),
     # phi   = matrix(runif(dataset_joint$Nt * dataset_joint$Nlv, 0.5, 1.5), 
     #                nrow = dataset_joint$Nt, ncol = dataset_joint$Nlv),
@@ -411,16 +413,17 @@ out_joint <- stan(
            
              "lambda_raw", "gamma_repro_raw", "gamma_surv_raw",
            
-             "a_1", "a_2", "delta", "tau"
+             # "a_1", "a_2", 
+           "delta", "tau"
           # , "phi", "phi_r", "phi_s"
            , "lp__"
   ),
   control = list(adapt_delta = 0.95, max_treedepth = 15), 
-  iter = 250,          
-  warmup = 125
+  iter = 2000,          
+  warmup = 1000
 )
 
-saveRDS(out_joint, 'Output_gamma_shrink_no_phi.rds')
+saveRDS(out_joint, 'Output_gamma_shrink_no_phi_or_a.rds')
 
 
 

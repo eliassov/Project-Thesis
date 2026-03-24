@@ -59,3 +59,39 @@ So, I suspect that the fix is not as simple as adding more iterations, that woul
 
 Question: Maybe skip the local shrinkage and only have the global shrinkage, because all the phi values are around 1. And we haven't been doing that at all previously. 
 
+
+
+Alright, now I will run a model with maximum 3 latent variables instead of 4, and i will not include the trait-specific (local) penalty. See if that works better. Here are the results (it also took a lot shorter, roughly 2 h 15 min for 250 iterations vs like 8 hours for 200 iterations in the previous run):
+
+```{r}
+out_no_phi <- readRDS("output_markov/Output_gamma_shrink_no_phi.rds")
+```
+
+Let's take a look at everything we can about these results then: 
+
+```{r}
+print(out_no_phi, probs = c(0.025, 0.975), digits_summary = 3)
+
+```
+
+
+```{r}
+library(rstan)
+library(bayesplot)
+library(ggplot2)
+
+times_no_phi <- get_elapsed_time(out_no_phi)
+
+print(times_no_phi)
+
+chains_no_phi1 <- mcmc_trace(out_no_phi, pars = c("Lambda[1,1]", "Lambda[1,2]", "Lambda[3,1]", "Lambda[3,2]", "Lambda[2,3]"))
+chains_no_phi2 <- mcmc_trace(out_no_phi, pars = c("tau[1]", "tau[2]", "tau[3]", "gamma_repro[3]"))
+
+print(chains_no_phi1)
+print(chains_no_phi2)
+```
+we have sign flipping of the third latent variable i think (chain 4). now it would be very tempting to just constrain (anchor) one trait per latent variable. The issue with that is something that happened on a previous run, in which what happened was that i constrained the first trait to be positive for the first lv, and the second trait to be positive for the second latent variable. And what happened then is that it caused the body size to be the second latent variable instead of the first. 
+
+TIP: IF I GET STUCK INSIDE A DOULBE TMUX TERMINAL JUST TYPE RESET AND ENTER INSIDE IT. 
+
+

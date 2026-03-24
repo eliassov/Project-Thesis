@@ -41,13 +41,19 @@ data {
 }
 
 
-// transformed data {
-//   real<lower=0> nu = 3.0; // Hyperparameter from the paper 
-// }
+transformed data {
+  // real<lower=0> nu = 3.0; // Hyperparameter from the paper
+  real<lower=0> a_1 = 2.1;
+  real<lower=0> a_2 = 3.1;
+}
 
 
 parameters {
   // Intercepts (Since we dropped the X matrix)
+  
+  
+  real<lower=0> lambda_raw_11;
+  matrix[Nt, Nlv] lambda_raw_unanchored;
   
   matrix[K_morph, Nt] beta_morph;
   vector[K_repro] beta_repro;
@@ -62,7 +68,7 @@ parameters {
   // real<lower=0, upper=1> rho;
   vector<lower=0, upper=1>[Nlv] h2_lv; 
   
-  matrix[Nt, Nlv] lambda_raw;
+  // matrix[Nt, Nlv] lambda_raw;
 
   // Latent Effects
   matrix[Nlv, Na] w_a;  
@@ -89,9 +95,9 @@ parameters {
   vector<lower=0>[Nlv] delta; // Global shrinkage (per LV)
   
   // Shrinkage hyperparameterers
-  real<lower=0> a_1; 
-  real<lower=0> a_2;
-  
+  // real<lower=0> a_1; 
+  // real<lower=0> a_2;
+  // 
   
 }
 
@@ -122,6 +128,9 @@ transformed parameters {
     tau[i] = tau[i-1] * delta[i];
   }
   
+  matrix[Nt, Nlv] lambda_raw = lambda_raw_unanchored;
+  lambda_raw[1, 1] = lambda_raw_11;
+  
   matrix[Nt, Nlv] Lambda;
   vector[Nlv] gamma_repro;
   vector[Nlv] gamma_surv;
@@ -149,7 +158,8 @@ model {
 
   sd_R ~ normal(0, 1);
   
-  to_vector(lambda_raw) ~ normal(0,1);
+  lambda_raw_11 ~ std_normal();
+  to_vector(lambda_raw_unanchored) ~ std_normal();
   
   to_vector(beta_morph) ~ normal(0,1);
   beta_repro ~ normal(0,1);
@@ -170,8 +180,8 @@ model {
   sd_year_surv ~ exponential(2); 
   sd_init_morph ~ exponential(2);
   
-  a_1 ~ gamma(2,1);
-  a_2 ~ gamma(2,1);
+  // a_1 ~ gamma(2,1);
+  // a_2 ~ gamma(2,1);
   
   delta[1] ~ gamma(a_1,1);
   for(h in 2:Nlv) {
@@ -245,9 +255,9 @@ generated quantities {
     surv_var_explained[h]  = square(gamma_surv[h]);
   }
   
-  // Calculate relative proportions (ONLY for morphology)
-  for (h in 1:Nlv) {
-    morph_prop_var_explained[h] = morph_var_explained[h] / total_morph_var;
-  }
+  // // Calculate relative proportions (ONLY for morphology)
+  // for (h in 1:Nlv) {
+  //   morph_prop_var_explained[h] = morph_var_explained[h] / total_morph_var;
+  // }
 }
 
