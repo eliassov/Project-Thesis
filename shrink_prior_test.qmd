@@ -95,3 +95,123 @@ we have sign flipping of the third latent variable i think (chain 4). now it wou
 TIP: IF I GET STUCK INSIDE A DOULBE TMUX TERMINAL JUST TYPE RESET AND ENTER INSIDE IT. 
 
 
+
+Now I'm running it with the a_1 and a_2 pre-specified instead of estimated, also a few minor adjustments, I think. 
+
+```{r}
+out_no_phi_or_a <- readRDS("output_markov/Output_gamma_shrink_no_phi_or_a.rds")
+
+print(out_no_phi_or_a, probs = c(0.025, 0.975), digits_summary = 3)
+```
+
+Oops, I accidentally removed the definition of the proportion of the variance explained, causing som missing values. But that can just be computed afterwards.
+
+Are the a's necessary to estimate in order to select the number of latent variables? In any case, let's take a look at the chains for the Lambda's and the tau's as well as the gamma's.
+
+```{r}
+library(rstan)
+library(bayesplot)
+library(ggplot2)
+
+times_no_phi_or_a <- get_elapsed_time(out_no_phi_or_a)
+print(times_no_phi_or_a)
+
+
+clean_lambda_array <- as.array(out_no_phi_or_a, 
+                               pars = c("Lambda[1,1]", "Lambda[1,2]", "Lambda[1,3]", 
+                                        "Lambda[2,1]", "Lambda[2,2]", "Lambda[2,3]", 
+                                        "Lambda[3,1]", "Lambda[3,2]", "Lambda[3,3]"))
+
+clean_lambda_array2 <- as.array(out_no_phi_or_a, 
+                               pars = c("Lambda[4,1]", "Lambda[4,2]", "Lambda[4,3]", 
+                                        "Lambda[5,1]", "Lambda[5,2]", "Lambda[5,3]"))
+
+clean_tau_gamma_array <- as.array(out_no_phi_or_a, 
+                               pars = c("tau[1]", "tau[2]", "tau[3]", "gamma_repro[1]","gamma_repro[2]","gamma_repro[3]", "gamma_surv[1]", "gamma_surv[2]", "gamma_surv[3]"))
+
+
+# 2. Pass the clean array directly to mcmc_trace (no need for the 'pars' argument here)
+chains_no_phi_or_a1 <- mcmc_trace(clean_lambda_array)
+chains_no_phi_or_a2 <- mcmc_trace(clean_lambda_array2)
+chains_no_phi_or_a3 <- mcmc_trace(clean_tau_gamma_array)
+
+print(chains_no_phi_or_a1)
+print(chains_no_phi_or_a2)
+print(chains_no_phi_or_a3)
+
+```
+It is clear that the second LV has sign flipping. Otherwise the results look fine, it seems again that the tarsus is more aligned with the second latent variable than the first, which is interesting. 
+
+```{r}
+
+clean_h2_array <- as.array(out_no_phi_or_a, 
+                               pars = c("h2_lv[1]", "h2_lv[2]", "h2_lv[3]"))
+
+chains_no_phi_or_a4 <- mcmc_trace(clean_h2_array)
+
+print(chains_no_phi_or_a4)
+
+
+```
+It's clear that the second latent variable shows sign flipping, so let's correct that and plot out the results after that change. 
+
+```{r}
+library(rstan)
+library(bayesplot)
+
+# 1. Define all the Lambda and Gamma parameters we care about
+all_pars <- c(
+  "Lambda[1,1]", "Lambda[1,2]", "Lambda[1,3]",
+  "Lambda[2,1]", "Lambda[2,2]", "Lambda[2,3]",
+  "Lambda[3,1]", "Lambda[3,2]", "Lambda[3,3]",
+  "Lambda[4,1]", "Lambda[4,2]", "Lambda[4,3]",
+  "Lambda[5,1]", "Lambda[5,2]", "Lambda[5,3]",
+  "gamma_repro[1]", "gamma_repro[2]", "gamma_repro[3]",
+  "gamma_surv[1]",  "gamma_surv[2]",  "gamma_surv[3]"
+)
+
+# Extract into a 3D array: Dimensions are [iterations, chains, parameters]
+full_array <- as.array(out_no_phi_or_a, pars = all_pars)
+
+# 2. Identify ONLY the parameters that belong to Latent Variable 2
+lv2_pars <- c(
+  "Lambda[1,2]", "Lambda[2,2]", "Lambda[3,2]", 
+  "Lambda[4,2]", "Lambda[5,2]", 
+  "gamma_repro[2]", "gamma_surv[2]"
+)
+
+# 3. Flip the signs for Chains 1 and 4
+chains_to_flip <- c(2, 3)
+
+for (p in lv2_pars) {
+  # Multiply those specific chains by -1
+  full_array[, chains_to_flip, p] <- full_array[, chains_to_flip, p] * -1
+}
+
+# 4. Visual Check: Plot the trace of LV2 to ensure they are now merged!
+# (They should look like a single fuzzy caterpillar now)
+color_scheme_set("mix-blue-red")
+print(mcmc_trace(full_array, pars = c("Lambda[1,2]", "Lambda[2,2]", "Lambda[3,2]")))
+
+# 5. Calculate the CORRECTED summary statistics
+# rstan's monitor() function rebuilds the summary table (including Rhat) from our modified array
+# 5. Calculate the CORRECTED summary statistics
+# We explicitly set warmup = 0 so rstan knows the array is already clean
+# Load the modern Stan summary package
+library(posterior)
+
+# Convert your modified array into a "draws" object
+clean_draws <- as_draws_array(full_array)
+
+# Generate a clean summary table (automatically calculates Rhat and ESS!)
+corrected_summary <- summarise_draws(clean_draws)
+
+# Print it nicely to the console
+# Force it to a base R dataframe to bypass the printing bug
+clean_df <- as.data.frame(corrected_summary)
+
+# Print specific columns so it fits on your screen
+print(clean_df[, c("variable", "mean", "sd", "q5", "q95", "rhat", "ess_bulk")])
+```
+OK, now it's looking better, although it's not converged. But it looks like the model is not strictly rejecting the third latent variable, although the shrinkage is real. 
+

@@ -238,8 +238,8 @@ generated quantities {
   // --- 2. FITNESS: The Downstream Effects ---
   // (Since the LV has a variance of 1, the variance it explains 
   // on the linear predictor scale is simply the squared coefficient)
-  vector[Nlv] repro_var_explained;
-  vector[Nlv] surv_var_explained;
+  // vector[Nlv] repro_var_explained;
+  // vector[Nlv] surv_var_explained;
 
   // Calculate absolute variances
   for (h in 1:Nlv) {
@@ -250,14 +250,14 @@ generated quantities {
     }
     total_morph_var += morph_var_explained[h]; 
     
-    // B. Fitness (Squared selection gradients)
-    repro_var_explained[h] = square(gamma_repro[h]);
-    surv_var_explained[h]  = square(gamma_surv[h]);
+    // // B. Fitness (Squared selection gradients)
+    // repro_var_explained[h] = square(gamma_repro[h]);
+    // surv_var_explained[h]  = square(gamma_surv[h]);
   }
   
-  // // Calculate relative proportions (ONLY for morphology)
-  // for (h in 1:Nlv) {
-  //   morph_prop_var_explained[h] = morph_var_explained[h] / total_morph_var;
-  // }
+  // Calculate relative proportions (ONLY for morphology)
+  for (h in 1:Nlv) {
+    morph_prop_var_explained[h] = morph_var_explained[h] / total_morph_var;
+  }
 }
 
