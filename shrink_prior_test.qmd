@@ -52,16 +52,12 @@ print(chains2)
 ```
 
 
-Okay, so it's not sign flipping we have, it's that the model has no idea what any of the parameters are. It's either label switching or the model just has no clue what it's doing. I think the paper might mention that it doesn't solve the rotational problem, only the dimension problem (need to verify this, because I thought the point of the paper was that we shouldn't enforce an echelon form of the loading matrix and thereby this was a way to avoid the rotational issue and hopefully solve it by not enforcing a structure, but allowing the model to select it and there hopfully being a single mode that the model lands on given the shrinkage of the variances), but I thought the shrinkage prior would also ensure we don't have label switching, but it might be an issue that the model simply isn't identifiable with this many latent variables as well. 
+Okay, so it's not sign flipping we have, it's that the model has no idea what any of the parameters are. It's either label switching or the model just has no clue what it's doing. I think the paper might mention that it doesn't solve the rotational problem, only the dimension problem (need to verify this, because I thought the point of the paper was that we shouldn't enforce an echelon form of the loading matrix and thereby this was a way to avoid the rotational issue and hopefully solve it by not enforcing a structure, but allowing the model to select it and there hopefully being a single mode that the model lands on given the shrinkage of the variances), but I thought the shrinkage prior would also ensure we don't have label switching, but it might be an issue that the model simply isn't identifiable with this many latent variables as well. 
 
 So, I suspect that the fix is not as simple as adding more iterations, that would also take forever. Firstly we probably need to try with Nlv = 3 max. Then, we should probably anchor the first trait to load positively on the first factor. 
 
 
-Question: Maybe skip the local shrinkage and only have the global shrinkage, because all the phi values are around 1. And we haven't been doing that at all previously. 
-
-
-
-Alright, now I will run a model with maximum 3 latent variables instead of 4, and i will not include the trait-specific (local) penalty. See if that works better. Here are the results (it also took a lot shorter, roughly 2 h 15 min for 250 iterations vs like 8 hours for 200 iterations in the previous run):
+Alright, now I will run a model with maximum 3 latent variables instead of 4, and i will not include the trait-specific (local) penalty (phi's). See if that works better. Here are the results (it also took a lot shorter, roughly 2 h 15 min for 250 iterations vs like 8 hours for 200 iterations in the previous run):
 
 ```{r}
 out_no_phi <- readRDS("output_markov/Output_gamma_shrink_no_phi.rds")
@@ -90,7 +86,7 @@ chains_no_phi2 <- mcmc_trace(out_no_phi, pars = c("tau[1]", "tau[2]", "tau[3]", 
 print(chains_no_phi1)
 print(chains_no_phi2)
 ```
-we have sign flipping of the third latent variable i think (chain 4). now it would be very tempting to just constrain (anchor) one trait per latent variable. The issue with that is something that happened on a previous run, in which what happened was that i constrained the first trait to be positive for the first lv, and the second trait to be positive for the second latent variable. And what happened then is that it caused the body size to be the second latent variable instead of the first. 
+We have sign flipping of the third latent variable i think (chain 4). now it would be very tempting to just constrain (anchor) one trait per latent variable. The issue with that is something that happened on a previous run, in which what happened was that i constrained the first trait to be positive for the first lv, and the second trait to be positive for the second latent variable. And what happened then is that it caused the body size to be the second latent variable instead of the first. 
 
 TIP: IF I GET STUCK INSIDE A DOULBE TMUX TERMINAL JUST TYPE RESET AND ENTER INSIDE IT. 
 
@@ -104,7 +100,7 @@ out_no_phi_or_a <- readRDS("output_markov/Output_gamma_shrink_no_phi_or_a.rds")
 print(out_no_phi_or_a, probs = c(0.025, 0.975), digits_summary = 3)
 ```
 
-Oops, I accidentally removed the definition of the proportion of the variance explained, causing som missing values. But that can just be computed afterwards.
+Oops, I accidentally removed the definition of the proportion of the variance explained, causing some missing values. But that can just be computed afterwards.
 
 Are the a's necessary to estimate in order to select the number of latent variables? In any case, let's take a look at the chains for the Lambda's and the tau's as well as the gamma's.
 
@@ -213,5 +209,5 @@ clean_df <- as.data.frame(corrected_summary)
 # Print specific columns so it fits on your screen
 print(clean_df[, c("variable", "mean", "sd", "q5", "q95", "rhat", "ess_bulk")])
 ```
-OK, now it's looking better, although it's not converged. But it looks like the model is not strictly rejecting the third latent variable, although the shrinkage is real. 
+OK, now it's looking better, although it's not converged properly and the second chain seem to be seriously struggling, but more iterations might help. But it might also be label switching between the second and third or the first and second ones too, so we might need an anchor, need to ask Bob. But it looks like the model is not strictly rejecting the third latent variable, although the shrinkage is real.
 
