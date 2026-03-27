@@ -59,7 +59,7 @@ parameters {
   vector[K_repro] beta_repro;
   vector[K_surv] beta_surv;
 
-  // Selection Gradients (The link between Size and Fitness)
+  // Selection Gradients 
   vector[Nlv] gamma_repro_raw;
   vector[Nlv] gamma_surv_raw;
 
@@ -200,7 +200,6 @@ model {
   // 1. Morphology
 for(i in 1:No_morph){
     for(t in 1:Nt){
-      // FIX: dot_product safely multiplies the bird's Nlv scores by the trait's Nlv loadings
       real mu = dot_product(X_morph[i], beta_morph[, t])
               + dot_product(LV[animal_morph[i]], Lambda[t]) 
               + z_year_morph[year_morph[i], t] * sd_year_morph[t]
@@ -211,7 +210,6 @@ for(i in 1:No_morph){
   
   // 2. Reproduction (Poisson)
   for(i in 1:No_repro){
-    // FIX: dot_product handles all LVs automatically, no hardcoding [1] and [2]!
     real log_lambda = dot_product(X_repro[i], beta_repro)
                     + dot_product(LV[animal_repro[i]], gamma_repro)
                     + z_year_repro[year_repro[i]] * sd_year_repro;
@@ -220,7 +218,6 @@ for(i in 1:No_morph){
 
   // 3. Survival (Bernoulli)
   for(i in 1:No_surv){
-    // FIX: dot_product again!
     real logit_p = dot_product(X_surv[i], beta_surv)
                  + dot_product(LV[animal_surv[i]], gamma_surv)
                  + z_year_surv[year_surv[i]] * sd_year_surv;
@@ -255,7 +252,7 @@ generated quantities {
     // surv_var_explained[h]  = square(gamma_surv[h]);
   }
   
-  // Calculate relative proportions (ONLY for morphology)
+  // Calculate relative proportions (only for morphology)
   for (h in 1:Nlv) {
     morph_prop_var_explained[h] = morph_var_explained[h] / total_morph_var;
   }

@@ -211,3 +211,23 @@ print(clean_df[, c("variable", "mean", "sd", "q5", "q95", "rhat", "ess_bulk")])
 ```
 OK, now it's looking better, although it's not converged properly and the second chain seem to be seriously struggling, but more iterations might help. But it might also be label switching between the second and third or the first and second ones too, so we might need an anchor, need to ask Bob. But it looks like the model is not strictly rejecting the third latent variable, although the shrinkage is real.
 
+
+
+
+
+
+
+from meeting 26 march:
+
+using pca/pc comp to rotate after the run so that the first factor has the most variance.
+
+also set the initialization so that the parameters are very close to what i expect them to be. which ones exactly? not completely sure. but i guess most if i have an idea. 
+
+
+need to do before long run:
+- vectorization/ask for improvements
+- figure out whether i can output during the run (almost check)
+- figure out the settings on markov, how many cores etc. (check)
+- figure out settings like iterations, max tree depth etc. (almost check)
+- maybe remove the non-used effects from script and maybe make sure not to remove the individuals missing data i don't use on this run (almost check, just gotta fix the outlier stuff)
+

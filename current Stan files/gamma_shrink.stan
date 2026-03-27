@@ -47,26 +47,24 @@ transformed data {
 
 
 parameters {
-  // Intercepts (Since we dropped the X matrix)
-  
+  // Just Intercepts (since we dropped the X matrix)
   matrix[K_morph, Nt] beta_morph;
   vector[K_repro] beta_repro;
   vector[K_surv] beta_surv;
 
-  // Selection Gradients (The link between Size and Fitness)
+  // Fitness loadings/gradients 
   vector[Nlv] gamma_repro_raw;
   vector[Nlv] gamma_surv_raw;
 
   // Variances
   vector<lower=0>[Nt] sd_R; 
-  // real<lower=0, upper=1> rho;
   vector<lower=0, upper=1>[Nlv] h2_lv; 
   
   matrix[Nt, Nlv] lambda_raw;
 
   // Latent Effects
-  matrix[Nlv, Na] w_a;  
-  matrix[Nlv, Na] w_pe; 
+  matrix[Na, Nlv] w_a;  
+  matrix[Na, Nlv] w_pe;
   
   // Random Effects (Year and Measurer)
   matrix[N_year, Nt] z_year_morph;
@@ -101,18 +99,18 @@ transformed parameters {
   {
     matrix[Na+1, Nlv] aug_a;
     aug_a[Na+1] = rep_row_vector(0, Nlv);
+    
     for (i in 1:Na) {
        aug_a[i] = 0.5 * aug_a[dam[i]] + 0.5 * aug_a[sire[i]] 
-                  + sqrt(dii[i]) * w_a[, i]'; 
+                  + sqrt(dii[i]) * w_a[i]; 
     }
     G_effect = aug_a[1:Na];
   }
 
-  // 2. Latent Factor
-  matrix[Na, Nlv] LV;
-  for(k in 1:Nlv) {
-    LV[, k] = sqrt(h2_lv[k]) * G_effect[, k] + sqrt(1 - h2_lv[k]) * w_pe[k, ]';
-  }
+  // 2. Latent Factor (vectorized)
+  // diag_post_multiply scales the columns of a matrix by a vector.
+  matrix[Na, Nlv] LV = diag_post_multiply(G_effect, sqrt(h2_lv)) 
+                     + diag_post_multiply(w_pe, sqrt(1 - h2_lv));
 
   vector<lower=0>[Nlv] tau;
 
@@ -126,22 +124,18 @@ transformed parameters {
   vector[Nlv] gamma_repro;
   vector[Nlv] gamma_surv;
   
-  for(j in 1:Nt) {
-    for(h in 1:Nlv) {
-      Lambda[j,h] = lambda_raw[j,h] / sqrt(phi[j,h] * tau[h]); // Implements the shrinkage on the loadings (non-centered parameterization)
-    }
-  }
   
-  for(h in 1:Nlv) {
-    gamma_repro[h] = gamma_repro_raw[h] / sqrt(phi_r[h] * tau[h]);
-  }
-  
-  for(h in 1:Nlv) {
-    gamma_surv[h] = gamma_surv_raw[h] / sqrt(phi_s[h] * tau[h]);
-  }
+ 
 
+for(t in 1:Nt) {
+    Lambda[t, ] = lambda_raw[t, ] ./ sqrt(phi[t, ] .* tau'); 
+  }
+  
+  gamma_repro = gamma_repro_raw ./ sqrt(phi_r .* tau);
+  gamma_surv  = gamma_surv_raw  ./ sqrt(phi_s .* tau);
 
 }
+
 
 model {
   // Priors
@@ -170,6 +164,12 @@ model {
   sd_year_surv ~ exponential(2); 
   sd_init_morph ~ exponential(2);
   
+  
+  matrix[N_year, Nt] year_eff = diag_post_multiply(z_year_morph, sd_year_morph);
+  matrix[N_init, Nt] init_eff = diag_post_multiply(z_init_morph, sd_init_morph);
+  
+  
+  
   a_1 ~ gamma(2,1);
   a_2 ~ gamma(2,1);
   
@@ -185,37 +185,31 @@ model {
 
   
 
-  // --- LIKELIHOODS ---
+  matrix[No_morph, Nt] mu_morph = X_morph * beta_morph 
+                                  + LV[animal_morph] * Lambda' 
+                                  + year_eff[year_morph] 
+                                  + init_eff[init_morph];
+                                  
   
-  // 1. Morphology
-for(i in 1:No_morph){
-    for(t in 1:Nt){
-      // FIX: dot_product safely multiplies the bird's Nlv scores by the trait's Nlv loadings
-      real mu = dot_product(X_morph[i], beta_morph[, t])
-              + dot_product(LV[animal_morph[i]], Lambda[t]) 
-              + z_year_morph[year_morph[i], t] * sd_year_morph[t]
-              + z_init_morph[init_morph[i], t] * sd_init_morph[t];
-      Y_morph[i, t] ~ normal(mu, sd_R[t]);
-    }
+  // Evaluate likelihood per trait
+  for(t in 1:Nt) {
+    Y_morph[, t] ~ normal(mu_morph[, t], sd_R[t]);
   }
+    
+    // 2. Reproduction (Fully Vectorized)
+  vector[No_repro] log_lambda = X_repro * beta_repro
+                                + LV[animal_repro] * gamma_repro
+                                + (z_year_repro * sd_year_repro)[year_repro];
+                                
+  Y_repro ~ poisson_log(log_lambda);
   
-  // 2. Reproduction (Poisson)
-  for(i in 1:No_repro){
-    // FIX: dot_product handles all LVs automatically, no hardcoding [1] and [2]!
-    real log_lambda = dot_product(X_repro[i], beta_repro)
-                    + dot_product(LV[animal_repro[i]], gamma_repro)
-                    + z_year_repro[year_repro[i]] * sd_year_repro;
-    Y_repro[i] ~ poisson_log(log_lambda);
-  }
-
-  // 3. Survival (Bernoulli)
-  for(i in 1:No_surv){
-    // FIX: dot_product again!
-    real logit_p = dot_product(X_surv[i], beta_surv)
-                 + dot_product(LV[animal_surv[i]], gamma_surv)
-                 + z_year_surv[year_surv[i]] * sd_year_surv;
-    Y_surv[i] ~ bernoulli_logit(logit_p);
-  }
+    // 3. Survival (Fully Vectorized)
+  vector[No_surv] logit_p = X_surv * beta_surv
+                            + LV[animal_surv] * gamma_surv
+                            + (z_year_surv * sd_year_surv)[year_surv];
+                            
+  Y_surv ~ bernoulli_logit(logit_p);
+  
 }
 
 
@@ -240,12 +234,12 @@ generated quantities {
     }
     total_morph_var += morph_var_explained[h]; 
     
-    // B. Fitness (Squared selection gradients)
+    // B. Fitness (Squared selection gradients) (need to verify if this makes sense)
     repro_var_explained[h] = square(gamma_repro[h]);
     surv_var_explained[h]  = square(gamma_surv[h]);
   }
   
-  // Calculate relative proportions (ONLY for morphology)
+  // Calculate relative proportions (only for morphology)
   for (h in 1:Nlv) {
     morph_prop_var_explained[h] = morph_var_explained[h] / total_morph_var;
   }
