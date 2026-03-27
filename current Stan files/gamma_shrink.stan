@@ -94,8 +94,16 @@ parameters {
 }
 
 transformed parameters {
-  // 1. Pedigree Recursion
+
   matrix[Na, Nlv] G_effect; 
+  matrix[Na, Nlv] LV;
+  vector<lower=0>[Nlv] tau;
+  matrix[Nt, Nlv] Lambda;
+  vector[Nlv] gamma_repro;
+  vector[Nlv] gamma_surv;
+
+
+  // Pedigree Recursion
   {
     matrix[Na+1, Nlv] aug_a;
     aug_a[Na+1] = rep_row_vector(0, Nlv);
@@ -107,48 +115,39 @@ transformed parameters {
     G_effect = aug_a[1:Na];
   }
 
-  // 2. Latent Factor (vectorized)
-  // diag_post_multiply scales the columns of a matrix by a vector.
-  matrix[Na, Nlv] LV = diag_post_multiply(G_effect, sqrt(h2_lv)) 
-                     + diag_post_multiply(w_pe, sqrt(1 - h2_lv));
+  // Latent Factor
+  LV = diag_post_multiply(G_effect, sqrt(h2_lv)) 
+       + diag_post_multiply(w_pe, sqrt(1 - h2_lv));
 
-  vector<lower=0>[Nlv] tau;
-
+  // Global Shrinkage
   tau[1] = delta[1];
-  
   for(i in 2:Nlv) {
     tau[i] = tau[i-1] * delta[i];
   }
   
-  matrix[Nt, Nlv] Lambda;
-  vector[Nlv] gamma_repro;
-  vector[Nlv] gamma_surv;
-  
-  
- 
-
-for(t in 1:Nt) {
+  // Local shrinkage and fitness gradients
+  for(t in 1:Nt) {
     Lambda[t, ] = lambda_raw[t, ] ./ sqrt(phi[t, ] .* tau'); 
   }
-  
   gamma_repro = gamma_repro_raw ./ sqrt(phi_r .* tau);
   gamma_surv  = gamma_surv_raw  ./ sqrt(phi_s .* tau);
-
 }
 
 
 model {
-  // Priors
-  h2_lv ~ beta(2.5, 2.5); 
+  matrix[N_year, Nt] year_eff;
+  matrix[N_init, Nt] init_eff;
+  matrix[No_morph, Nt] mu_morph;
+  vector[No_repro] log_lambda;
+  vector[No_surv] logit_p;
 
+  // --- PRIORS ---
+  h2_lv ~ beta(2.5, 2.5); 
   sd_R ~ normal(0, 1);
-  
   to_vector(lambda_raw) ~ normal(0,1);
-  
   to_vector(beta_morph) ~ normal(0,1);
   beta_repro ~ normal(0,1);
   beta_surv ~ normal(0,1);
-  
   gamma_repro_raw ~ normal(0, 1);
   gamma_surv_raw ~ normal(0, 1);
 
@@ -159,16 +158,10 @@ model {
   z_year_surv ~ std_normal();
   to_vector(z_init_morph) ~ std_normal();
   
-  sd_year_morph ~ exponential(2); // Maybe think about these a bit more? 
+  sd_year_morph ~ exponential(2); 
   sd_year_repro ~ exponential(2); 
   sd_year_surv ~ exponential(2); 
   sd_init_morph ~ exponential(2);
-  
-  
-  matrix[N_year, Nt] year_eff = diag_post_multiply(z_year_morph, sd_year_morph);
-  matrix[N_init, Nt] init_eff = diag_post_multiply(z_init_morph, sd_init_morph);
-  
-  
   
   a_1 ~ gamma(2,1);
   a_2 ~ gamma(2,1);
@@ -179,37 +172,39 @@ model {
   }
   
   to_vector(phi) ~ gamma(nu/2, nu/2);
-  
   phi_r ~ gamma(nu/2, nu/2);
   phi_s ~ gamma(nu/2, nu/2);
 
-  
 
-  matrix[No_morph, Nt] mu_morph = X_morph * beta_morph 
-                                  + LV[animal_morph] * Lambda' 
-                                  + year_eff[year_morph] 
-                                  + init_eff[init_morph];
-                                  
+  // --- LIKELIHOOD CALCULATIONS ---
   
-  // Evaluate likelihood per trait
+  // Scale the random effects
+  year_eff = diag_post_multiply(z_year_morph, sd_year_morph);
+  init_eff = diag_post_multiply(z_init_morph, sd_init_morph);
+  
+  // Morphology
+  mu_morph = X_morph * beta_morph 
+             + LV[animal_morph] * Lambda' 
+             + year_eff[year_morph] 
+             + init_eff[init_morph];
+             
   for(t in 1:Nt) {
     Y_morph[, t] ~ normal(mu_morph[, t], sd_R[t]);
   }
     
-    // 2. Reproduction (Fully Vectorized)
-  vector[No_repro] log_lambda = X_repro * beta_repro
-                                + LV[animal_repro] * gamma_repro
-                                + (z_year_repro * sd_year_repro)[year_repro];
-                                
+  // Reproduction
+  log_lambda = X_repro * beta_repro
+               + LV[animal_repro] * gamma_repro
+               + (z_year_repro * sd_year_repro)[year_repro];
+               
   Y_repro ~ poisson_log(log_lambda);
   
-    // 3. Survival (Fully Vectorized)
-  vector[No_surv] logit_p = X_surv * beta_surv
-                            + LV[animal_surv] * gamma_surv
-                            + (z_year_surv * sd_year_surv)[year_surv];
-                            
+  // Survival
+  logit_p = X_surv * beta_surv
+            + LV[animal_surv] * gamma_surv
+            + (z_year_surv * sd_year_surv)[year_surv];
+            
   Y_surv ~ bernoulli_logit(logit_p);
-  
 }
 
 

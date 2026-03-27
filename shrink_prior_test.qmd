@@ -209,25 +209,29 @@ clean_df <- as.data.frame(corrected_summary)
 # Print specific columns so it fits on your screen
 print(clean_df[, c("variable", "mean", "sd", "q5", "q95", "rhat", "ess_bulk")])
 ```
-OK, now it's looking better, although it's not converged properly and the second chain seem to be seriously struggling, but more iterations might help. But it might also be label switching between the second and third or the first and second ones too, so we might need an anchor, need to ask Bob. But it looks like the model is not strictly rejecting the third latent variable, although the shrinkage is real.
+OK, now it's looking better, although it's not converged properly and the second chain seems to be seriously struggling, but more iterations might help. But it might also be label switching between the second and third or the first and second ones too, so we might need an anchor, need to ask Bob. But it looks like the model is not strictly rejecting the third latent variable, although the shrinkage is real.
 
 
 
+okay now let's take a peak at the really quick test i did
+```{r}
+out_quick_test <- readRDS("output_markov/Output_gamma_shrink_test1.rds")
+```
 
 
+```{r}
+print(out_quick_test, probs = c(0.025, 0.975), digits_summary = 3)
+```
+
+It looks like it works, but it was lightning fast (even though it was only 8 iterations). Let's look at the times.
+
+```{r}
+library(rstan)
+
+times_quick_test <- get_elapsed_time(out_quick_test)
+print(times_quick_test)
+```
+Yeah super duper fast, so I'll do a quick run with around 100-300 iterations to see if it actually maintains its high speed. Maybe the vectorization had that much impact? I also reduced max tree depth from 15 to 14, though, which I think cuts the max time per iteration in half.
 
 
-from meeting 26 march:
-
-using pca/pc comp to rotate after the run so that the first factor has the most variance.
-
-also set the initialization so that the parameters are very close to what i expect them to be. which ones exactly? not completely sure. but i guess most if i have an idea. 
-
-
-need to do before long run:
-- vectorization/ask for improvements
-- figure out whether i can output during the run (almost check)
-- figure out the settings on markov, how many cores etc. (check)
-- figure out settings like iterations, max tree depth etc. (almost check)
-- maybe remove the non-used effects from script and maybe make sure not to remove the individuals missing data i don't use on this run (almost check, just gotta fix the outlier stuff)
 

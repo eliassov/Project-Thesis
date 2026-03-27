@@ -84,38 +84,69 @@ trait_subset_temp <- trait_raw %>% filter(ringnr %in% valid_ids)
 #   filter(!is.na(age_class))
 # ==============================================================================
 # D. ROW-WISE STATISTICAL OUTLIER REMOVAL
-# ==============================================================================
+# # ==============================================================================
+# traits_to_check <- c("ving_h", "tars_h", "nebb_l", "nebb_h", "vekt")
+# bad_rows_global <- c() 
+# 
+# for(t in traits_to_check) {
+#   # f <- as.formula(paste(t, "~ sex + age_class"))
+#   # fit <- lm(f, data = trait_subset_temp, na.action = na.exclude)
+#   
+#   # resids <- rstudent(fit)
+#   
+#   cutoff <- if(t == "vekt") 6.5 else 4.5 
+#   
+#   bad_rows_trait <- which(abs(resids) > cutoff)
+#   
+#   if(length(bad_rows_trait) > 0) {
+#     bad_rows_global <- c(bad_rows_global, bad_rows_trait)
+#     cat("Trait:", t, "- Removing", length(bad_rows_trait), "specific measurements (rows)\n")
+#   }
+# }
+
+
+
 traits_to_check <- c("ving_h", "tars_h", "nebb_l", "nebb_h", "vekt")
 bad_rows_global <- c() 
 
 for(t in traits_to_check) {
-  # f <- as.formula(paste(t, "~ sex + age_class"))
-  # fit <- lm(f, data = trait_subset_temp, na.action = na.exclude)
   
-  # resids <- rstudent(fit)
+  # Extract the raw vector for the trait
+  vals <- trait_subset_temp[[t]]
   
+  # Calculate standard Z-scores: (value - mean) / standard deviation
+  # We use na.rm = TRUE to ensure NAs don't break the math
+  z_scores <- (vals - mean(vals, na.rm = TRUE)) / sd(vals, na.rm = TRUE)
+  
+  # Keep your established cutoffs
   cutoff <- if(t == "vekt") 6.5 else 4.5 
   
-  bad_rows_trait <- which(abs(resids) > cutoff)
+  # Identify rows exceeding the cutoff. 
+  # which() safely ignores NAs, so missing measurements won't trigger as outliers.
+  bad_rows_trait <- which(abs(z_scores) > cutoff)
   
   if(length(bad_rows_trait) > 0) {
     bad_rows_global <- c(bad_rows_global, bad_rows_trait)
-    cat("Trait:", t, "- Removing", length(bad_rows_trait), "specific measurements (rows)\n")
+    cat("Trait:", t, "- Flagged", length(bad_rows_trait), "extreme measurements (rows)\n")
   }
 }
+
+# Remove duplicate row indices (in case a bird has crazy values for multiple traits)
+bad_rows_global <- unique(bad_rows_global)
+
+
 
 # ==============================================================================
 # E. FINAL DATASET
 # ==============================================================================
 if(length(bad_rows_global) > 0) {
   trait_subset_lv <- trait_subset_temp[-unique(bad_rows_global), ]
+  cat("\nTotal unique rows removed:", length(bad_rows_global), "\n")
 } else {
   trait_subset_lv <- trait_subset_temp
+  cat("\nNo outliers detected beyond the specified cutoffs.\n")
+  
 }
-
-cat("Final Clean N Rows: ", nrow(trait_subset_lv), "\n")
-
-
 
 
 trait_subset_lv <- trait_subset_lv %>%
@@ -176,7 +207,7 @@ trait_subset_lv <- trait_subset_lv %>%
 fitness_data <- read.csv("Fitness.csv", header = TRUE, stringsAsFactors = FALSE, na.strings = "NA", fileEncoding = "Windows-1252")
 
 fitness_data_clean <- fitness_data %>%
-  dplyr::select(Location, Year_ID, Year, Sex, Own_survival, N_Recruits, Least_age) %>%
+  dplyr::select(Location, Year_ID, Own_survival, N_Recruits) %>%
   filter(grepl("^Hestmann", Location)) %>%
   mutate(
     # Extract the ring number
@@ -392,7 +423,7 @@ init_fn_joint <- function() {
 
 # Run the Joint Model
 out_joint <- stan(
-  file = "gamma_no_phi.stan",
+  file = "gamma_shrink.stan",
   data = dataset_joint,
   init = init_fn_joint,        
   chains = 4, 
@@ -414,11 +445,11 @@ out_joint <- stan(
            , "lp__"
   ),
   control = list(adapt_delta = 0.96, max_treedepth = 14), 
-  iter = 3000,          
-  warmup = 1500
+  iter = 200,          
+  warmup = 100
 )
 
-saveRDS(out_joint, 'Output_gamma_shrink_no_phi_or_a.rds')
+saveRDS(out_joint, 'Output_gamma_shrink_test2.rds')
 
 
 
